@@ -1,0 +1,5 @@
+{
+  "name": "TubeDigest",
+  "description": "Monitor YouTube channels, generate AI summaries for new videos, and receive Telegram alerts.",
+  "requestFramePermissions": []
+}
