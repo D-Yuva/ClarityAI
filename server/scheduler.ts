@@ -75,7 +75,7 @@ export async function checkFeeds() {
               summary = `AI Error: ${err.message || 'An unknown error occurred.'}`;
             }
           } else {
-            summary = "Summary pending generation... (Action Required: Add Gemini API Key via Web Dashboard)";
+            summary = "Summary pending generation... (Action Required: Add Gemini API Key via GlimpseAI Settings)";
           }
 
           const { error: insertError } = await supabase.from('videos').insert({

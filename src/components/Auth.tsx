@@ -42,8 +42,8 @@ export default function Auth({ onLogin }: { onLogin: () => void }) {
         <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-200 max-w-sm w-full">
                 <div className="flex items-center gap-2 mb-8 justify-center">
-                    <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">TD</div>
-                    <h1 className="text-2xl font-bold tracking-tight">TubeDigest</h1>
+                    <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">GA</div>
+                    <h1 className="text-2xl font-bold tracking-tight">GlimpseAI</h1>
                 </div>
 
                 <h2 className="text-xl font-bold mb-6 text-center">

@@ -256,8 +256,8 @@ function Dashboard({ session }: { session: Session }) {
       <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">TD</div>
-            <h1 className="text-xl font-bold tracking-tight">TubeDigest</h1>
+            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold">GA</div>
+            <h1 className="text-xl font-bold tracking-tight">GlimpseAI</h1>
           </div>
           <nav className="flex gap-1 bg-stone-100 p-1 rounded-lg">
             {['feed', 'channels', 'settings'].map((tab) => (
@@ -265,8 +265,8 @@ function Dashboard({ session }: { session: Session }) {
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === tab
-                    ? 'bg-white text-black shadow-sm'
-                    : 'text-stone-500 hover:text-stone-700'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-stone-500 hover:text-stone-700'
                   }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
