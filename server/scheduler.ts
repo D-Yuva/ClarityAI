@@ -42,16 +42,8 @@ export async function checkFeeds() {
             videoType = 'short';
           }
 
-          let summary = ""; // No auto-summary per user request
-          let notified = false;
-
-          const botToken = settingsByUserId[channel.user_id]?.telegram_bot_token;
-          const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
-
-          if (botToken && chatId) {
-            await sendNotification(botToken, chatId, item.title || '', item.link || '', '');
-            notified = true;
-          }
+          // The user only wants Telegram notifications when a summary is manually generated.
+          // Therefore, we only insert the video silently into the database here.
 
           const { error: insertError } = await supabase.from('videos').insert({
             channel_id: channel.id,
@@ -59,9 +51,9 @@ export async function checkFeeds() {
             title: item.title,
             link: item.link,
             published_at: item.isoDate,
-            summary: summary,
+            summary: "",
             video_type: videoType,
-            notified: notified
+            notified: false
           });
 
           if (insertError) console.error("Error inserting video:", insertError);
