@@ -65,7 +65,12 @@ export async function checkFeeds() {
 
             } catch (err: any) {
               console.error("Background AI Summary failed:", err);
-              summary = `AI Error: ${err.message || 'An unknown error occurred.'}`;
+              const errMsg = typeof err.message === 'string' ? err.message : JSON.stringify(err);
+              if (errMsg.includes('429') || errMsg.includes('Quota exceeded') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+                summary = "AI Limit Hit: You have exceeded your free Gemini API quota.";
+              } else {
+                summary = "AI Error: Could not generate summary.";
+              }
             }
           } else {
             summary = "Summary pending generation... (Action Required: Add Gemini API Key via GlimpseAI Settings)";

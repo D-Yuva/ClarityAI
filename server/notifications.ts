@@ -5,8 +5,8 @@ export async function sendNotification(botToken: string, chatId: string, title: 
   const safeTitle = escapeHTML(title || '');
   const safeSummary = escapeHTML(summary || '');
   const message = summary
-    ? `<b>New Video Alert!</b> 📺\n\n<b>${safeTitle}</b>\n\n${safeSummary}\n\n${link}`
-    : `<b>New Video Alert!</b> 📺\n\n<b>${safeTitle}</b>\n\n${link}`;
+    ? `📺 <b>New Video Alert!</b>\n\n📌 <b>Title:</b> ${safeTitle}\n\n📝 <b>Summary:</b>\n${safeSummary}\n\n🔗 <b>Link:</b> ${link}`
+    : `📺 <b>New Video Alert!</b>\n\n📌 <b>Title:</b> ${safeTitle}\n\n🔗 <b>Link:</b> ${link}`;
 
   // Priority 1: Telegram (Official, Free, Safe)
   if (botToken && chatId) {
