@@ -259,7 +259,8 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
 
       // Upsert to handle ON CONFLICT DO NOTHING natively in Supabase via unique constraint
       if (videos.length > 0) {
-        await client.from('videos').upsert(videos, { onConflict: 'channel_id, video_id', ignoreDuplicates: true });
+        const { error } = await client.from('videos').upsert(videos, { onConflict: 'channel_id,video_id', ignoreDuplicates: true });
+        if (error) console.error("Database upsert error backfilling videos:", error);
       }
     }
     console.log(`Backfilled ${feed.items?.length || 0} videos for channel ${channelId}`);

@@ -182,7 +182,7 @@ function Dashboard({ session }: { session: Session }) {
   };
 
   const fetchSettings = async () => {
-    const { data } = await supabaseClient.from('user_settings').select('*').single();
+    const { data, error } = await supabaseClient.from('user_settings').select('*').eq('user_id', session.user.id).maybeSingle();
     if (data) {
       setSettings(prev => ({
         ...prev,
@@ -230,11 +230,16 @@ function Dashboard({ session }: { session: Session }) {
 
   const saveSettingsToCloud = async (e: React.FormEvent) => {
     e.preventDefault();
-    await supabaseClient.from('user_settings').upsert({
+    const { error } = await supabaseClient.from('user_settings').upsert({
       user_id: session.user.id,
       ...settings,
       gemini_api_key: userApiKey // ensure local key is synced to cloud for backend use
     });
+    if (error) {
+      console.error("Save settings error:", error);
+      alert("Failed to save settings: " + error.message);
+      return;
+    }
     alert('Settings saved to cloud!');
   };
 
