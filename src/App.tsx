@@ -483,13 +483,39 @@ function Dashboard({ session }: { session: Session }) {
                     <h3 className="text-lg font-bold">Telegram Notifications</h3>
                   </div>
 
-                  <div className="text-sm text-stone-600 mb-6 bg-stone-50 p-4 rounded-xl border border-stone-200">
-                    <p className="font-bold mb-2">How to get these credentials:</p>
-                    <ol className="list-decimal pl-4 space-y-2">
-                      <li>Message <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">@BotFather</a> on Telegram and send <code>/newbot</code>. Give your bot a name and a username to get your <strong>Bot Token</strong>.</li>
-                      <li>Search for and message <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">@userinfobot</a> to get your personal <strong>Chat ID</strong>.</li>
-                      <li>Search for your new bot's username on Telegram and click <strong>Start</strong> (this is required before the bot can message you).</li>
-                    </ol>
+                  <div className="text-sm text-stone-600 mb-6 bg-stone-50 p-5 rounded-xl border border-stone-200">
+                    <p className="font-bold text-base mb-3 text-stone-800">Complete Guide: Setting up Telegram Notifications</p>
+
+                    <div className="space-y-4">
+                      <div>
+                        <p className="font-semibold text-stone-800 mb-1">Step 1: Create your own Bot</p>
+                        <ol className="list-decimal pl-4 space-y-1">
+                          <li>Open Telegram and search for <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">@BotFather</a> (make sure it has the blue verified tick).</li>
+                          <li>Click <strong>Start</strong> or send the message: <code>/newbot</code></li>
+                          <li>BotFather will ask for a name. Type any name you want (e.g., <em>My Video Summarizer</em>).</li>
+                          <li>BotFather will ask for a username. It must end in "bot" (e.g., <em>YuvaVideoBot</em>).</li>
+                          <li>BotFather will reply with a long string of text under "Use this token to access the HTTP API". <strong>Copy that entire string. That is your Bot Token.</strong></li>
+                        </ol>
+                      </div>
+
+                      <div className="border-t border-stone-200 pt-3">
+                        <p className="font-semibold text-stone-800 mb-1">Step 2: Get your personal Chat ID</p>
+                        <ol className="list-decimal pl-4 space-y-1">
+                          <li>In a new Telegram search, look for <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">@userinfobot</a>.</li>
+                          <li>Click <strong>Start</strong> or send any message.</li>
+                          <li>It will reply with your personal details. <strong>Copy the string of numbers next to "Id". That is your Chat ID.</strong></li>
+                        </ol>
+                      </div>
+
+                      <div className="border-t border-stone-200 pt-3">
+                        <p className="font-semibold text-stone-800 mb-1">Step 3: Activate your Bot</p>
+                        <ol className="list-decimal pl-4 space-y-1">
+                          <li>Search for the username you created in Step 1 (e.g., <em>@YuvaVideoBot</em>).</li>
+                          <li>Open the chat with your new bot and click the <strong>Start</strong> button at the bottom.</li>
+                          <li><em>Crucial: If you skip this step, Telegram will block the bot from sending you messages!</em></li>
+                        </ol>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
