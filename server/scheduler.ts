@@ -63,19 +63,20 @@ export async function checkFeeds() {
 
               summary = response.text || "Could not generate summary.";
 
-              const botToken = process.env.TELEGRAM_BOT_TOKEN || settingsByUserId[channel.user_id]?.telegram_bot_token;
-              const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
-
-              if (botToken && chatId) {
-                await sendNotification(botToken, chatId, item.title || '', item.link || '', summary);
-                notified = true;
-              }
             } catch (err: any) {
               console.error("Background AI Summary failed:", err);
               summary = `AI Error: ${err.message || 'An unknown error occurred.'}`;
             }
           } else {
             summary = "Summary pending generation... (Action Required: Add Gemini API Key via GlimpseAI Settings)";
+          }
+
+          const botToken = process.env.TELEGRAM_BOT_TOKEN || settingsByUserId[channel.user_id]?.telegram_bot_token;
+          const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
+
+          if (botToken && chatId) {
+            await sendNotification(botToken, chatId, item.title || '', item.link || '', summary);
+            notified = true;
           }
 
           const { error: insertError } = await supabase.from('videos').insert({
@@ -99,7 +100,7 @@ export async function checkFeeds() {
 }
 
 export function startScheduler() {
-  cron.schedule('*/45 * * * *', () => {
+  cron.schedule('*/2 * * * *', () => {
     checkFeeds();
   });
 
