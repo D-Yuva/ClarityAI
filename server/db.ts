@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 // The backend should ideally use the SERVICE_ROLE_KEY to bypass RLS for background tasks.
 // If it's not provided, it falls back to the ANON_KEY (which may be blocked by RLS for background jobs).
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+// Prioritize SUPABASE_SERVICE_ROLE_KEY for the server/admin client, fallback to ANON_KEY
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseKey) {
