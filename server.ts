@@ -25,6 +25,9 @@ async function startServer() {
     // Setup API Routes
     setupRoutes(app);
 
+    // Bootstrap Telegram Webhooks
+    import('./server/routes').then(m => m.bootstrapWebhooks());
+
     // API 404 Handler - Prevent fallthrough to Vite
     app.use('/api/*', (req, res) => {
       res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });

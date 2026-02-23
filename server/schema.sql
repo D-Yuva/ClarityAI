@@ -21,6 +21,7 @@ CREATE TABLE public.videos (
     link TEXT,
     published_at TIMESTAMP WITH TIME ZONE,
     summary TEXT,
+    transcript TEXT,
     video_type TEXT DEFAULT 'longform',
     notified BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,

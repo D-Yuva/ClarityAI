@@ -11,6 +11,9 @@ const parser = new Parser();
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 
+import { getTranscript } from './transcriber';
+import { GoogleGenAI } from "@google/genai";
+
 // Helper to create an authenticated client using the user's JWT token
 function getAuthClient(req: any) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -18,6 +21,34 @@ function getAuthClient(req: any) {
   return createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } }
   });
+}
+
+// Helper to set Telegram Webhook
+async function setTelegramWebhook(botToken: string) {
+  const domain = process.env.RAILWAY_PUBLIC_DOMAIN || process.env.PUBLIC_URL;
+  if (!domain || !botToken) return;
+
+  const webhookUrl = `https://${domain}/api/webhook/telegram`;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook?url=${webhookUrl}`);
+    const data = await res.json();
+    console.log('Telegram Webhook Registration:', data);
+  } catch (err) {
+    console.error('Failed to set Telegram Webhook:', err);
+  }
+}
+
+// Helper to register all webhooks on startup
+export async function bootstrapWebhooks() {
+  const { data: allSettings } = await supabase.from('user_settings').select('telegram_bot_token');
+  if (!allSettings) return;
+
+  console.log(`Bootstrapping Telegram webhooks for ${allSettings.length} users...`);
+  for (const settings of allSettings) {
+    if (settings.telegram_bot_token) {
+      await setTelegramWebhook(settings.telegram_bot_token);
+    }
+  }
 }
 
 export function setupRoutes(app: Express) {
@@ -172,6 +203,12 @@ export function setupRoutes(app: Express) {
     });
 
     if (error) return res.status(500).json({ error: error.message });
+
+    // Register webhook on save
+    if (telegram_bot_token) {
+      await setTelegramWebhook(telegram_bot_token);
+    }
+
     res.json({ success: true });
   });
 
@@ -238,6 +275,71 @@ export function setupRoutes(app: Express) {
     } catch (error: any) {
       console.error('Test notification error:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Telegram Webhook
+  app.post('/api/webhook/telegram', async (req, res) => {
+    const { message } = req.body;
+    if (!message || !message.reply_to_message || !message.text) {
+      return res.sendStatus(200); // Only handle replies
+    }
+
+    const chatId = message.chat.id.toString();
+    const userQuestion = message.text;
+    const parentText = message.reply_to_message.text || '';
+
+    try {
+      // 1. Find the video link in the parent message
+      const linkMatch = parentText.match(/https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/[^\s]+/);
+      if (!linkMatch) return res.sendStatus(200);
+      const videoLink = linkMatch[0];
+
+      // 2. Fetch user settings to get Gemini Key and Bot Token
+      const { data: userSettings } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).single();
+      if (!userSettings || !userSettings.gemini_api_key) return res.sendStatus(200);
+
+      // 3. Get Video Info & Transcript
+      let { data: video } = await supabase.from('videos').select('*').eq('link', videoLink).single();
+      if (!video) return res.sendStatus(200);
+
+      let transcript = video.transcript || "";
+      if (!transcript) {
+        transcript = await getTranscript(video.link);
+        if (transcript) {
+          await supabase.from('videos').update({ transcript }).eq('id', video.id);
+        }
+      }
+
+      // 4. Ask Gemini
+      const ai = new GoogleGenAI({ apiKey: userSettings.gemini_api_key });
+      const prompt = `
+        You are GlimpseAI, an agentic video assistant. 
+        A user is asking a question about the video: "${video.title}".
+        
+        Context (Transcript/Description):
+        ${transcript || video.summary || "No transcript available."}
+        
+        User Question: "${userQuestion}"
+        
+        Provide a helpful, precise answer based strictly on the content provided. 
+        If the answer isn't in the transcript, say so politely.
+      `;
+
+      const aiResponse = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+
+      const answer = aiResponse.text || "I'm sorry, I couldn't process that question.";
+
+      // 5. Reply to Telegram
+      await sendNotification(userSettings.telegram_bot_token, chatId, video.title || 'Answer', video.link || '', answer);
+
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Telegram Webhook Error:', error);
+      res.sendStatus(200); // Always return 200 to Telegram
     }
   });
 }
