@@ -503,6 +503,15 @@ function Dashboard({ session }: { session: Session }) {
                     <h3 className="text-lg font-bold">Telegram Notifications</h3>
                   </div>
 
+                  <div className="text-sm text-stone-600 mb-6 bg-stone-50 p-4 rounded-xl border border-stone-200">
+                    <p className="font-bold mb-2">How to get these credentials:</p>
+                    <ol className="list-decimal pl-4 space-y-2">
+                      <li>Message <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">@BotFather</a> on Telegram and send <code>/newbot</code> to get your <strong>Bot Token</strong>.</li>
+                      <li>Message <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">@userinfobot</a> to get your personal <strong>Chat ID</strong>.</li>
+                      <li>Search for your new bot's username on Telegram and click <strong>Start</strong> (required before it can message you).</li>
+                    </ol>
+                  </div>
+
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Bot Token</label>
