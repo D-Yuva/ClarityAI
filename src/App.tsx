@@ -88,27 +88,7 @@ function Dashboard({ session }: { session: Session }) {
     setSettings(prev => ({ ...prev, gemini_api_key: key }));
   };
 
-  useEffect(() => {
-    if (!userApiKey || videos.length === 0) return;
-
-    const generatePendingSummaries = async () => {
-      const pendingVideos = videos.filter(v =>
-        !v.summary ||
-        v.summary === "Summary unavailable." ||
-        v.summary.includes("pending") ||
-        v.summary.includes("AI Summary failed") ||
-        v.summary.includes("Could not generate")
-      );
-
-      for (const video of pendingVideos) {
-        if (isSummarizing === video.id) continue;
-        await generateSummary(video);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    };
-
-    generatePendingSummaries();
-  }, [videos.length, userApiKey]);
+  // Auto-generation disabled: User wants to manually generate summaries
 
   const generateSummary = async (video: Video) => {
     if (!userApiKey) {

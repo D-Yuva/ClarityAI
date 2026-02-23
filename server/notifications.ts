@@ -1,7 +1,9 @@
 export async function sendNotification(botToken: string, chatId: string, title: string, link: string, summary: string) {
   // Escape Markdown characters in summary to prevent errors
-  const safeSummary = summary.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
-  const message = `*New Video Alert!* 📺\n\n*${title}*\n\n${safeSummary}\n\n${link}`;
+  const safeSummary = summary ? summary.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&') : '';
+  const message = summary
+    ? `*New Video Alert!* 📺\n\n*${title}*\n\n${safeSummary}\n\n${link}`
+    : `*New Video Alert!* 📺\n\n*${title}*\n\n${link}`;
 
   // Priority 1: Telegram (Official, Free, Safe)
   if (botToken && chatId) {
