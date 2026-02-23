@@ -168,11 +168,16 @@ function Dashboard({ session }: { session: Session }) {
   };
 
   const fetchVideos = async () => {
-    const { data } = await supabaseClient
+    const { data, error } = await supabaseClient
       .from('videos')
       .select('*, channels(name)')
       .order('published_at', { ascending: false })
       .limit(100);
+
+    if (error) {
+      console.error("Supabase error fetching videos:", error);
+    }
+
     if (data) setVideos(data as any[]);
   };
 
@@ -526,7 +531,7 @@ function Dashboard({ session }: { session: Session }) {
                         type="button"
                         onClick={async () => {
                           if (!settings.telegram_bot_token || !settings.telegram_chat_id) {
-                            alert('Please set and save settings first!');
+                            alert('Please set and save settings first. (Make sure you clicked Save Settings!)');
                             return;
                           }
                           try {
@@ -534,10 +539,14 @@ function Dashboard({ session }: { session: Session }) {
                               method: 'POST',
                               headers: { 'Authorization': `Bearer ${session.access_token}` }
                             });
-                            if (res.ok) alert('Test sent!');
-                            else alert('Failed to send test.');
-                          } catch (e) {
-                            alert('Error sending test message');
+                            const data = await res.json();
+                            if (res.ok && data.success) {
+                              alert('Test sent successfully! Check your Telegram.');
+                            } else {
+                              alert(`Failed to send test. Telegram Error: ${data.error || 'Unknown error'}`);
+                            }
+                          } catch (e: any) {
+                            alert(`Error sending test message: ${e.message}`);
                           }
                         }}
                         className="bg-white text-black border border-stone-300 px-6 py-2 rounded-xl font-medium hover:bg-stone-50 w-full sm:w-auto"
