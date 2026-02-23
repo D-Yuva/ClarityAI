@@ -184,25 +184,7 @@ export function setupRoutes(app: Express) {
     let { data: settings, error } = await client.from('user_settings').select('*').eq('user_id', user.id).single();
     if (error && error.code !== 'PGRST116') return res.status(500).json({ error: error.message });
 
-    if (!settings) {
-      settings = {};
-    }
-
-    // Auto-generate auth token if missing
-    if (!settings.telegram_auth_token) {
-      const token = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const { data: updated, error: upsertError } = await client.from('user_settings').upsert({
-        user_id: user.id,
-        ...settings,
-        telegram_auth_token: token
-      }).select().single();
-
-      if (!upsertError && updated) {
-        settings = updated;
-      }
-    }
-
-    res.json(settings);
+    res.json(settings || {});
   });
 
   // Save Settings
@@ -316,14 +298,19 @@ export function setupRoutes(app: Express) {
     try {
       // Handle the Magic Link /start command
       if (userText.startsWith('/start ')) {
-        const token = userText.split(' ')[1];
-        if (token) {
-          const { data: userSettings } = await supabase.from('user_settings').select('user_id').eq('telegram_auth_token', token).single();
+        const userId = userText.split(' ')[1];
+        if (userId && userId.length > 10) {
+          const { data: userSettings } = await supabase.from('user_settings').select('user_id').eq('user_id', userId).single();
           if (userSettings) {
-            await supabase.from('user_settings').update({ telegram_chat_id: chatId }).eq('user_id', userSettings.user_id);
+            await supabase.from('user_settings').update({ telegram_chat_id: chatId }).eq('user_id', userId);
             await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'GlimpseAI Connected!', 'https://your-app.com', 'Your Telegram account is now successfully linked. You will receive video summaries here.');
           } else {
-            await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Connection Failed', '', 'Invalid connection code. Please try again from the app.');
+            const { error: insertError } = await supabase.from('user_settings').insert({ user_id: userId, telegram_chat_id: chatId });
+            if (!insertError) {
+              await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'GlimpseAI Connected!', 'https://your-app.com', 'Your Telegram account is now successfully linked. You will receive video summaries here.');
+            } else {
+              await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Connection Failed', '', 'Invalid connection code. Please try again from the app.');
+            }
           }
         }
         return res.sendStatus(200);

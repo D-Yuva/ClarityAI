@@ -33,8 +33,7 @@ CREATE TABLE public.user_settings (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     telegram_bot_token TEXT,
     telegram_chat_id TEXT,
-    gemini_api_key TEXT,
-    telegram_auth_token TEXT UNIQUE
+    gemini_api_key TEXT
 );
 
 -- Enable RLS

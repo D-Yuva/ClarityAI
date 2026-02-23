@@ -492,9 +492,9 @@ function Dashboard({ session }: { session: Session }) {
                         <div>
                           <p className="font-bold text-lg mb-2 text-stone-800">1-Click Setup</p>
                           <p className="mb-4 text-stone-600 text-base">Click the button below to securely connect your Telegram account.</p>
-                          {settings.telegram_auth_token && (
+                          {session?.user?.id && (
                             <a
-                              href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'GlimpseAI_Bot'}?start=${settings.telegram_auth_token}`}
+                              href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'GlimpseAI_Bot'}?start=${session.user.id}`}
                               target="_blank"
                               rel="noreferrer"
                               className="bg-[#2AABEE] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#229ED9] inline-flex items-center gap-2 transition-colors"
