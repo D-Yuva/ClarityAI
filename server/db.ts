@@ -1,54 +1,19 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
 
-const dbPath = path.join(process.cwd(), 'database.sqlite');
-const db = new Database(dbPath);
+// The backend should ideally use the SERVICE_ROLE_KEY to bypass RLS for background tasks.
+// If it's not provided, it falls back to the ANON_KEY (which may be blocked by RLS for background jobs).
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
-export function initDb() {
-  // Channels table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS channels (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      url TEXT NOT NULL,
-      rss_url TEXT NOT NULL,
-      last_checked DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Videos table (to track what we've seen)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS videos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      channel_id INTEGER,
-      video_id TEXT UNIQUE NOT NULL,
-      title TEXT,
-      link TEXT,
-      published_at DATETIME,
-      summary TEXT,
-      video_type TEXT DEFAULT 'longform',
-      notified BOOLEAN DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(channel_id) REFERENCES channels(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Migration: Add video_type column if it doesn't exist
-  try {
-    db.exec("ALTER TABLE videos ADD COLUMN video_type TEXT DEFAULT 'longform'");
-  } catch (e) {
-    // Column likely already exists
-  }
-
-  // Settings table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    )
-  `);
+if (!supabaseUrl || !supabaseKey) {
+  console.warn("Missing Supabase URL or Key in environment variables!");
 }
 
-export { db };
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+// We keep initDb for backwards compatibility in server.ts, but it no longer creates SQLite tables.
+export function initDb() {
+  console.log("Supabase client initialized via db.ts");
+}
+
+export { supabase as db };

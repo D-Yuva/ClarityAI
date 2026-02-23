@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, Settings, ExternalLink, RefreshCw, Sparkles, Key } from 'lucide-react';
+import { Trash2, Plus, Settings, ExternalLink, RefreshCw, Sparkles, Key, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
+import { supabaseClient } from './lib/supabase';
+import Auth from './components/Auth';
+import { Session } from '@supabase/supabase-js';
 
 interface Channel {
-  id: number;
+  id: string;
   name: string;
   url: string;
   last_checked: string;
 }
 
 interface Video {
-  id: number;
+  id: string;
   title: string;
-  channel_name: string;
+  channels?: { name: string };
   summary: string;
   link: string;
   published_at: string;
@@ -21,20 +24,45 @@ interface Video {
 }
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) return <div className="min-h-screen bg-stone-100 flex items-center justify-center">Loading...</div>;
+
+  if (!session) {
+    return <Auth onLogin={() => { }} />;
+  }
+
+  return <Dashboard session={session} />;
+}
+
+function Dashboard({ session }: { session: Session }) {
   const [activeTab, setActiveTab] = useState<'feed' | 'channels' | 'settings'>('feed');
   const [channels, setChannels] = useState<Channel[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [newChannelUrl, setNewChannelUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
-  // User API Key State
-  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('GEMINI_API_KEY') || '');
-  const [isSummarizing, setIsSummarizing] = useState<number | null>(null);
 
-  // Settings State
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('GEMINI_API_KEY') || '');
+  const [isSummarizing, setIsSummarizing] = useState<string | null>(null);
+
   const [settings, setSettings] = useState({
     telegram_bot_token: '',
-    telegram_chat_id: ''
+    telegram_chat_id: '',
+    gemini_api_key: ''
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -45,54 +73,48 @@ export default function App() {
         await Promise.all([fetchChannels(), fetchVideos(), fetchSettings()]);
       } catch (err) {
         console.error("Initialization error:", err);
-        setError("Failed to connect to server. Please ensure the backend is running.");
       }
     };
     init();
-    
+
     // Poll for new videos every 30s
     const interval = setInterval(fetchVideos, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Save API Key to LocalStorage
-  const saveApiKey = (key: string) => {
+  const saveApiKeyLocally = (key: string) => {
     setUserApiKey(key);
     localStorage.setItem('GEMINI_API_KEY', key);
+    setSettings(prev => ({ ...prev, gemini_api_key: key }));
   };
 
-  // Auto-generate summaries when videos are loaded and API key exists
   useEffect(() => {
     if (!userApiKey || videos.length === 0) return;
 
     const generatePendingSummaries = async () => {
-      const pendingVideos = videos.filter(v => 
-        !v.summary || 
-        v.summary === "Summary unavailable." || 
+      const pendingVideos = videos.filter(v =>
+        !v.summary ||
+        v.summary === "Summary unavailable." ||
+        v.summary.includes("pending") ||
         v.summary.includes("AI Summary failed") ||
         v.summary.includes("Could not generate")
       );
 
-      // Process one by one to avoid rate limits
       for (const video of pendingVideos) {
-        // Skip if already processing
         if (isSummarizing === video.id) continue;
-        
         await generateSummary(video);
-        // Small delay between requests
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     };
 
     generatePendingSummaries();
-  }, [videos.length, userApiKey]); // Depend on length to trigger on new fetches
+  }, [videos.length, userApiKey]);
 
   const generateSummary = async (video: Video) => {
     if (!userApiKey) {
-      // Only alert if triggered manually (not by auto-effect)
       if (isSummarizing === video.id) {
-         alert("Please enter your Gemini API Key in Settings first!");
-         setActiveTab('settings');
+        alert("Please enter your Gemini API Key in Settings first!");
+        setActiveTab('settings');
       }
       return;
     }
@@ -106,33 +128,33 @@ export default function App() {
         Title: ${video.title}
         Link: ${video.link}
       `;
-      
+
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
       });
-      
+
       const summaryText = response.text || "Could not generate summary.";
-      
-      // Update local state immediately
+
       setVideos(prev => prev.map(v => v.id === video.id ? { ...v, summary: summaryText } : v));
 
-      // Save to server and trigger notification
+      // Use backend API to save summary AND trigger telegram notification
       await fetch(`/api/videos/${video.id}/summary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ summary: summaryText })
       });
 
     } catch (err: any) {
       console.error("Summarization failed:", err);
-      // Don't alert on auto-generation failures to avoid spamming the user
     } finally {
       setIsSummarizing(null);
     }
   };
 
-  // Helper to determine video type client-side if needed
   const getVideoType = (video: Video): 'short' | 'longform' => {
     if (video.video_type) return video.video_type;
     if (video.title.toLowerCase().includes('#shorts')) return 'short';
@@ -141,37 +163,31 @@ export default function App() {
   };
 
   const fetchChannels = async () => {
-    try {
-      const res = await fetch('/api/channels');
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      setChannels(await res.json());
-    } catch (e) {
-      console.error("Fetch channels failed:", e);
-    }
+    const { data } = await supabaseClient.from('channels').select('*').order('created_at', { ascending: false });
+    if (data) setChannels(data);
   };
 
   const fetchVideos = async () => {
-    try {
-      const res = await fetch('/api/videos');
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      setVideos(await res.json());
-    } catch (e) {
-      console.error("Fetch videos failed:", e);
-    }
+    const { data } = await supabaseClient
+      .from('videos')
+      .select('*, channels(name)')
+      .order('published_at', { ascending: false })
+      .limit(100);
+    if (data) setVideos(data as any[]);
   };
 
   const fetchSettings = async () => {
-    try {
-      const res = await fetch('/api/settings');
-      if (res.ok) {
-        const data = await res.json();
-        setSettings({
-          telegram_bot_token: data.telegram_bot_token || '',
-          telegram_chat_id: data.telegram_chat_id || ''
-        });
+    const { data } = await supabaseClient.from('user_settings').select('*').single();
+    if (data) {
+      setSettings(prev => ({
+        ...prev,
+        telegram_bot_token: data.telegram_bot_token || '',
+        telegram_chat_id: data.telegram_chat_id || '',
+        gemini_api_key: data.gemini_api_key || ''
+      }));
+      if (data.gemini_api_key && !userApiKey) {
+        saveApiKeyLocally(data.gemini_api_key);
       }
-    } catch (e) {
-      console.error("Fetch settings failed:", e);
     }
   };
 
@@ -180,16 +196,19 @@ export default function App() {
     if (!newChannelUrl) return;
     setIsLoading(true);
     try {
+      // Must use backend to parse RSS feed securely avoiding CORS
       const res = await fetch('/api/channels', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ url: newChannelUrl })
       });
       if (!res.ok) throw new Error((await res.json()).error);
       setNewChannelUrl('');
       fetchChannels();
-      // Trigger a refresh of videos shortly after adding
-      setTimeout(fetchVideos, 5000);
+      setTimeout(fetchVideos, 2000);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -197,20 +216,21 @@ export default function App() {
     }
   };
 
-  const deleteChannel = async (id: number) => {
+  const deleteChannel = async (id: string) => {
     if (!confirm('Are you sure?')) return;
-    await fetch(`/api/channels/${id}`, { method: 'DELETE' });
+    await supabaseClient.from('channels').delete().eq('id', id);
     fetchChannels();
+    fetchVideos();
   };
 
-  const saveSettings = async (e: React.FormEvent) => {
+  const saveSettingsToCloud = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings)
+    await supabaseClient.from('user_settings').upsert({
+      user_id: session.user.id,
+      ...settings,
+      gemini_api_key: userApiKey // ensure local key is synced to cloud for backend use
     });
-    alert('Settings saved!');
+    alert('Settings saved to cloud!');
   };
 
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -218,7 +238,10 @@ export default function App() {
   const triggerRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await fetch('/api/refresh', { method: 'POST' });
+      await fetch('/api/refresh', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
       await fetchVideos();
       await fetchChannels();
     } catch (e) {
@@ -241,11 +264,10 @@ export default function App() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  activeTab === tab 
-                    ? 'bg-white text-black shadow-sm' 
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === tab
+                    ? 'bg-white text-black shadow-sm'
                     : 'text-stone-500 hover:text-stone-700'
-                }`}
+                  }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
@@ -264,7 +286,7 @@ export default function App() {
         )}
         <AnimatePresence mode="wait">
           {activeTab === 'feed' && (
-            <motion.div 
+            <motion.div
               key="feed"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -274,8 +296,8 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Latest Summaries</h2>
                 <div className="flex items-center gap-3">
-                  <button 
-                    onClick={triggerRefresh} 
+                  <button
+                    onClick={triggerRefresh}
                     disabled={isRefreshing}
                     className="p-2 hover:bg-stone-200 rounded-full transition-colors disabled:opacity-50"
                     title="Check for new videos now"
@@ -284,11 +306,11 @@ export default function App() {
                   </button>
                 </div>
               </div>
-              
+
               {videos.length === 0 ? (
                 <div className="text-center py-12 text-stone-500 bg-white rounded-2xl border border-stone-200">
                   <p className="mb-4">No videos yet.</p>
-                  <button 
+                  <button
                     onClick={() => setActiveTab('channels')}
                     className="text-red-600 font-medium hover:underline"
                   >
@@ -297,13 +319,12 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid gap-6">
-                  {videos
-                    .map((video) => (
+                  {videos.map((video) => (
                     <article key={video.id} className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md transition-shadow">
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <span className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1 block">
-                            {video.channel_name}
+                            {video.channels?.name || 'Unknown'}
                           </span>
                           <h3 className="text-lg font-bold leading-tight">
                             <a href={video.link} target="_blank" rel="noreferrer" className="hover:underline">
@@ -318,7 +339,7 @@ export default function App() {
                       <div className="bg-stone-50 p-4 rounded-xl text-sm text-stone-700 leading-relaxed border border-stone-100">
                         <div className="flex justify-between items-start mb-1">
                           <p className="font-medium text-stone-900">AI Summary:</p>
-                          {(!video.summary || video.summary.includes('unavailable') || video.summary.includes('Error') || video.summary.includes('failed')) && (
+                          {(!video.summary || video.summary.includes('unavailable') || video.summary.includes('pending') || video.summary.includes('failed')) && (
                             <button
                               onClick={() => generateSummary(video)}
                               disabled={isSummarizing === video.id}
@@ -329,7 +350,7 @@ export default function App() {
                               ) : (
                                 <Sparkles size={12} />
                               )}
-                              {video.summary && !video.summary.includes('unavailable') ? 'Retry' : 'Generate'}
+                              {video.summary && !video.summary.includes('unavailable') && !video.summary.includes('pending') ? 'Retry' : 'Generate'}
                             </button>
                           )}
                         </div>
@@ -357,7 +378,7 @@ export default function App() {
               className="space-y-6"
             >
               <h2 className="text-2xl font-bold">Managed Channels</h2>
-              
+
               <form onSubmit={addChannel} className="flex gap-2">
                 <input
                   type="url"
@@ -367,8 +388,8 @@ export default function App() {
                   onChange={(e) => setNewChannelUrl(e.target.value)}
                   required
                 />
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isLoading}
                   className="bg-black text-white px-6 py-2 rounded-xl font-medium hover:bg-stone-800 disabled:opacity-50 flex items-center gap-2"
                 >
@@ -390,7 +411,7 @@ export default function App() {
                       <span className="text-xs text-stone-400">
                         Last checked: {channel.last_checked ? new Date(channel.last_checked).toLocaleTimeString() : 'Never'}
                       </span>
-                      <button 
+                      <button
                         onClick={() => deleteChannel(channel.id)}
                         className="text-stone-400 hover:text-red-600 p-2"
                       >
@@ -416,145 +437,117 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-6"
             >
-              <h2 className="text-2xl font-bold">Notification Settings</h2>
-              
-              {/* API Key Section */}
-              <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold uppercase">Required for AI</div>
-                  <h3 className="text-lg font-bold">Gemini API Key</h3>
-                </div>
-                <p className="text-sm text-stone-600 mb-4">
-                  To generate AI summaries, you need to provide your own Google Gemini API Key. 
-                  It is stored locally in your browser.
-                </p>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
-                    <input
-                      type="password"
-                      placeholder="Paste your Gemini API Key here"
-                      className="w-full pl-10 pr-4 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      value={userApiKey}
-                      onChange={(e) => saveApiKey(e.target.value)}
-                    />
-                  </div>
-                  <a 
-                    href="https://aistudio.google.com/app/apikey" 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="bg-stone-100 text-stone-700 px-4 py-2 rounded-xl font-medium hover:bg-stone-200 flex items-center gap-2 whitespace-nowrap"
-                  >
-                    Get Key <ExternalLink size={16} />
-                  </a>
-                </div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">Cloud Settings</h2>
+                <button
+                  onClick={() => supabaseClient.auth.signOut()}
+                  className="text-stone-500 hover:text-red-600 flex items-center gap-2 px-3 py-1 border border-stone-300 rounded-lg text-sm bg-white"
+                >
+                  <LogOut size={16} /> Sign out
+                </button>
               </div>
 
-              {(!settings.telegram_bot_token || !settings.telegram_chat_id) && (
-                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm flex items-start gap-2">
-                  <span className="text-lg">⚠️</span>
-                  <div>
-                    <strong>Notifications are currently disabled.</strong>
-                    <p>Please configure Telegram settings below to enable alerts.</p>
+              <form onSubmit={saveSettingsToCloud} className="space-y-6">
+                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold uppercase">Required for AI</div>
+                    <h3 className="text-lg font-bold">Gemini API Key</h3>
                   </div>
-                </div>
-              )}
-              
-              {/* Telegram Section (Recommended) */}
-              <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase">Recommended</div>
-                  <h3 className="text-lg font-bold">Telegram Notifications</h3>
-                </div>
-                
-                <p className="text-sm text-stone-600 mb-6">
-                  Telegram is free, secure, and officially supported. It's the best alternative to WhatsApp for automated alerts.
-                </p>
-
-                <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 mb-6 text-sm">
-                  <p className="font-bold mb-2">How to set up:</p>
-                  <ol className="list-decimal list-inside space-y-2 text-stone-600">
-                    <li>
-                      <strong>Type <code>/newbot</code></strong> in the chat with <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">@BotFather</a> and hit send.
-                    </li>
-                    <li>
-                      <strong>Choose a Name:</strong> It will ask for a name (e.g., "My TubeDigest Bot"). This is what users will see.
-                    </li>
-                    <li>
-                      <strong>Choose a Username:</strong> It will ask for a username. This must end in <code>bot</code> (e.g., <code>my_tubedigest_bot</code> or <code>TubeDigestBot</code>). It must be unique.
-                    </li>
-                    <li>
-                      <strong>Copy the Token:</strong> Once successful, BotFather will give you a long string of characters (the API Token). Copy this into the app settings.
-                    </li>
-                    <li>
-                      <strong>Start Your Bot:</strong> Click the link to your new bot (<code>t.me/your_bot_name</code>) and click <strong>Start</strong>.
-                    </li>
-                    <li>
-                      <strong>Get Your Chat ID:</strong>
-                      <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                        <li>Search for <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">@userinfobot</a> on Telegram.</li>
-                        <li>Start a chat with it.</li>
-                        <li>It will reply with your Id. Copy this number into the app settings.</li>
-                      </ul>
-                    </li>
-                  </ol>
-                </div>
-                
-                <form onSubmit={saveSettings} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Bot Token</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                      className="w-full px-3 py-2 rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={settings.telegram_bot_token}
-                      onChange={(e) => setSettings({...settings, telegram_bot_token: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Your Chat ID</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 12345678"
-                      className="w-full px-3 py-2 rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={settings.telegram_chat_id}
-                      onChange={(e) => setSettings({...settings, telegram_chat_id: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div className="pt-2 flex gap-2">
-                    <button 
-                      type="submit" 
-                      className="bg-blue-600 text-white px-6 py-2 rounded-xl font-medium hover:bg-blue-700 w-full sm:w-auto"
+                  <p className="text-sm text-stone-600 mb-4">
+                    To generate AI summaries, you need to provide your own Google Gemini API Key.
+                    It is synced to your cloud account to process summaries in the background even when you are offline.
+                  </p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+                      <input
+                        type="password"
+                        placeholder="Paste your Gemini API Key here"
+                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        value={userApiKey}
+                        onChange={(e) => saveApiKeyLocally(e.target.value)}
+                      />
+                    </div>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-stone-100 text-stone-700 px-4 py-2 rounded-xl font-medium hover:bg-stone-200 flex items-center gap-2 whitespace-nowrap"
                     >
-                      Save Telegram Settings
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={async () => {
-                        if (!settings.telegram_bot_token || !settings.telegram_chat_id) {
-                          alert('Please save settings first!');
-                          return;
-                        }
-                        try {
-                          const res = await fetch('/api/test-notification', { method: 'POST' });
-                          const data = await res.json();
-                          if (res.ok) {
-                            alert('Test message sent! Check your Telegram.');
-                          } else {
-                            alert('Failed: ' + data.error);
+                      Get Key <ExternalLink size={16} />
+                    </a>
+                  </div>
+                </div>
+
+                {(!settings.telegram_bot_token || !settings.telegram_chat_id) && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm flex items-start gap-2">
+                    <span className="text-lg">⚠️</span>
+                    <div>
+                      <strong>Notifications are currently disabled.</strong>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <h3 className="text-lg font-bold">Telegram Notifications</h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Bot Token</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                        className="w-full px-3 py-2 rounded-lg border border-stone-300"
+                        value={settings.telegram_bot_token}
+                        onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Your Chat ID</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 12345678"
+                        className="w-full px-3 py-2 rounded-lg border border-stone-300"
+                        value={settings.telegram_chat_id}
+                        onChange={(e) => setSettings({ ...settings, telegram_chat_id: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-2 border-t border-stone-100 mt-4 pt-4">
+                      <button
+                        type="submit"
+                        className="bg-black text-white px-6 py-2 rounded-xl font-medium hover:bg-stone-800 w-full sm:w-auto"
+                      >
+                        Save Settings
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!settings.telegram_bot_token || !settings.telegram_chat_id) {
+                            alert('Please set and save settings first!');
+                            return;
                           }
-                        } catch (e) {
-                          alert('Error sending test message');
-                        }
-                      }}
-                      className="bg-white text-blue-600 border border-blue-200 px-6 py-2 rounded-xl font-medium hover:bg-blue-50 w-full sm:w-auto"
-                    >
-                      Test Connection
-                    </button>
+                          try {
+                            const res = await fetch('/api/test-notification', {
+                              method: 'POST',
+                              headers: { 'Authorization': `Bearer ${session.access_token}` }
+                            });
+                            if (res.ok) alert('Test sent!');
+                            else alert('Failed to send test.');
+                          } catch (e) {
+                            alert('Error sending test message');
+                          }
+                        }}
+                        className="bg-white text-black border border-stone-300 px-6 py-2 rounded-xl font-medium hover:bg-stone-50 w-full sm:w-auto"
+                      >
+                        Test Connection
+                      </button>
+                    </div>
                   </div>
-                </form>
-              </div>
+                </div>
+              </form>
             </motion.div>
           )}
         </AnimatePresence>

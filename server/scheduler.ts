@@ -1,127 +1,107 @@
 import cron from 'node-cron';
 import Parser from 'rss-parser';
-import { db } from './db';
+import { supabase } from './db';
 import { GoogleGenAI } from "@google/genai";
 import { sendNotification } from './notifications';
 
 const parser = new Parser();
 
-let ai: GoogleGenAI | null = null;
-
-function getAiClient() {
-  // Lazy initialization of the AI client
-  if (!ai) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-      console.warn("GEMINI_API_KEY is not set or is a placeholder. AI summaries will be disabled.");
-      return null;
-    }
-    ai = new GoogleGenAI({ apiKey });
-  }
-  return ai;
-}
-
 export async function checkFeeds() {
-  console.log('Checking feeds...');
-  const channels = db.prepare('SELECT * FROM channels').all();
+  console.log('Checking feeds (Scheduler)...');
 
-  for (const channel of channels as any[]) {
+  const { data: channels, error } = await supabase.from('channels').select('*');
+
+  if (error) {
+    console.error("Failed to fetch channels in scheduler:", error);
+    return;
+  }
+
+  // Fetch all user settings
+  const { data: allSettings } = await supabase.from('user_settings').select('*');
+  const settingsByUserId = (allSettings || []).reduce((acc: any, curr: any) => {
+    acc[curr.user_id] = curr;
+    return acc;
+  }, {});
+
+  for (const channel of channels || []) {
     try {
       const feed = await parser.parseURL(channel.rss_url);
-      
-      // Update last_checked
-      db.prepare('UPDATE channels SET last_checked = CURRENT_TIMESTAMP WHERE id = ?').run(channel.id);
 
-      // Check for new videos
+      await supabase.from('channels').update({ last_checked: new Date().toISOString() }).eq('id', channel.id);
+
       for (const item of feed.items) {
-        const videoId = item.id; // usually "yt:video:VIDEO_ID"
-        const existing = db.prepare('SELECT id FROM videos WHERE video_id = ?').get(videoId);
+        const videoId = item.id;
+
+        const { data: existing } = await supabase.from('videos').select('id').eq('channel_id', channel.id).eq('video_id', videoId).single();
 
         if (!existing) {
-          console.log(`New video found: ${item.title}`);
-          
-          // Step 1: Deterministic Classification
-          const title = item.title || '';
-          const description = item.contentSnippet || item.content || '';
+          console.log(`New video found for channel ${channel.name}: ${item.title}`);
+
           let videoType: 'short' | 'longform' = 'longform';
-          if (title.includes('#shorts') || description.toLowerCase().includes('short')) {
+          if ((item.title || '').includes('#shorts') || (item.contentSnippet || '').toLowerCase().includes('short')) {
             videoType = 'short';
           }
 
-          // Step 2: Generate Summary
           let summary = "Summary unavailable.";
-          const aiClient = getAiClient();
-          if (aiClient) {
+          let notified = false;
+
+          const userKey = settingsByUserId[channel.user_id]?.gemini_api_key;
+          if (userKey) {
             try {
+              const ai = new GoogleGenAI({ apiKey: userKey });
               const prompt = `
                 Analyze the following YouTube video and provide a concise, engaging summary (under 50 words).
                 Focus on what the viewer will learn or experience.
-                Title: ${title}
-                Description: ${description}
+                Title: ${item.title}
+                Link: ${item.link}
               `;
-              
-              const response = await aiClient.models.generateContent({
+
+              const response = await ai.models.generateContent({
                 model: "gemini-3-flash-preview",
                 contents: prompt,
               });
-              
+
               summary = response.text || "Could not generate summary.";
 
+              const botToken = settingsByUserId[channel.user_id]?.telegram_bot_token;
+              const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
+
+              if (botToken && chatId) {
+                await sendNotification(botToken, chatId, item.title || '', item.link || '', summary);
+                notified = true;
+              }
             } catch (err: any) {
-              console.error("AI Summary failed. Full error:", JSON.stringify(err, null, 2));
-              // Display the actual error in the summary for easier debugging
+              console.error("Background AI Summary failed:", err);
               summary = `AI Error: ${err.message || 'An unknown error occurred.'}`;
             }
+          } else {
+            summary = "Summary pending generation... (Action Required: Add Gemini API Key via Web Dashboard)";
           }
 
-          // Save to DB
-          const stmt = db.prepare(`
-            INSERT INTO videos (channel_id, video_id, title, link, published_at, summary, video_type, notified)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-          `);
-          stmt.run(channel.id, videoId, item.title, item.link, item.isoDate, summary, videoType);
+          const { error: insertError } = await supabase.from('videos').insert({
+            channel_id: channel.id,
+            video_id: videoId,
+            title: item.title,
+            link: item.link,
+            published_at: item.isoDate,
+            summary: summary,
+            video_type: videoType,
+            notified: notified
+          });
 
-
+          if (insertError) console.error("Error inserting video:", insertError);
         }
       }
     } catch (err) {
       console.error(`Error checking feed for ${channel.name}:`, err);
     }
   }
-
-  // After checking all feeds, send notifications for any new videos found
-  // DISABLED: Client-side summary generation now triggers notifications
-  // await sendPendingNotifications();
 }
 
 export function startScheduler() {
-  // Run every 45 minutes
   cron.schedule('*/45 * * * *', () => {
     checkFeeds();
   });
-  
-  // Also run immediately on startup after a short delay
+
   setTimeout(checkFeeds, 5000);
-}
-
-async function sendPendingNotifications() {
-  const videosToNotify = db.prepare(`
-    SELECT v.*, c.name as channel_name 
-    FROM videos v
-    JOIN channels c ON v.channel_id = c.id
-    WHERE v.notified = 0
-  `).all();
-
-  if (videosToNotify.length > 0) {
-    console.log(`Sending ${videosToNotify.length} new notifications...`);
-    for (const video of videosToNotify as any[]) {
-      try {
-        await sendNotification(video.title, video.link, video.summary);
-        db.prepare('UPDATE videos SET notified = 1 WHERE id = ?').run(video.id);
-        console.log(`Notification sent for: ${video.title}`);
-      } catch (error) {
-        console.error(`Failed to send notification for video ${video.id}:`, error);
-      }
-    }
-  }
 }

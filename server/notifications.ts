@@ -1,23 +1,18 @@
-import { db } from './db';
-
-export async function sendNotification(title: string, link: string, summary: string) {
-  const settings = db.prepare('SELECT * FROM settings').all() as any[];
-  const config = settings.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
-
+export async function sendNotification(botToken: string, chatId: string, title: string, link: string, summary: string) {
   // Escape Markdown characters in summary to prevent errors
   const safeSummary = summary.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
   const message = `*New Video Alert!* 📺\n\n*${title}*\n\n${safeSummary}\n\n${link}`;
 
   // Priority 1: Telegram (Official, Free, Safe)
-  if (config.telegram_bot_token && config.telegram_chat_id) {
+  if (botToken && chatId) {
     try {
       console.log('Sending via Telegram...');
-      const url = `https://api.telegram.org/bot${config.telegram_bot_token}/sendMessage`;
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chat_id: config.telegram_chat_id,
+          chat_id: chatId,
           text: message,
           parse_mode: 'Markdown'
         })
