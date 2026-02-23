@@ -28,7 +28,7 @@ async function setTelegramWebhook(botToken: string) {
   const domain = process.env.RAILWAY_PUBLIC_DOMAIN || process.env.PUBLIC_URL;
   if (!domain || !botToken) return;
 
-  const webhookUrl = `https://${domain}/api/webhook/telegram`;
+  const webhookUrl = `https://${domain.replace(/^https?:\/\//, '')}/api/webhook/telegram`;
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook?url=${webhookUrl}`);
     const data = await res.json();
@@ -38,17 +38,16 @@ async function setTelegramWebhook(botToken: string) {
   }
 }
 
-// Helper to register all webhooks on startup
+// Helper to register global webhook on startup
 export async function bootstrapWebhooks() {
-  const { data: allSettings } = await supabase.from('user_settings').select('telegram_bot_token');
-  if (!allSettings) return;
-
-  console.log(`Bootstrapping Telegram webhooks for ${allSettings.length} users...`);
-  for (const settings of allSettings) {
-    if (settings.telegram_bot_token) {
-      await setTelegramWebhook(settings.telegram_bot_token);
-    }
+  const globalBotToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!globalBotToken) {
+    console.log("No global TELEGRAM_BOT_TOKEN found. Skipping global webhook bootstrap.");
+    return;
   }
+
+  console.log(`Bootstrapping global Telegram webhook...`);
+  await setTelegramWebhook(globalBotToken);
 }
 
 export function setupRoutes(app: Express) {
@@ -182,10 +181,28 @@ export function setupRoutes(app: Express) {
     const { data: { user } } = await client.auth.getUser();
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { data: settings, error } = await client.from('user_settings').select('*').eq('user_id', user.id).single();
+    let { data: settings, error } = await client.from('user_settings').select('*').eq('user_id', user.id).single();
     if (error && error.code !== 'PGRST116') return res.status(500).json({ error: error.message });
 
-    res.json(settings || {});
+    if (!settings) {
+      settings = {};
+    }
+
+    // Auto-generate auth token if missing
+    if (!settings.telegram_auth_token) {
+      const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const { data: updated, error: upsertError } = await client.from('user_settings').upsert({
+        user_id: user.id,
+        ...settings,
+        telegram_auth_token: token
+      }).select().single();
+
+      if (!upsertError && updated) {
+        settings = updated;
+      }
+    }
+
+    res.json(settings);
   });
 
   // Save Settings
@@ -234,9 +251,12 @@ export function setupRoutes(app: Express) {
       // 3. Send Notification
       const { data: userSettings } = await supabase.from('user_settings').select('*').eq('user_id', video.channels.user_id).single();
 
-      if (userSettings && userSettings.telegram_bot_token && userSettings.telegram_chat_id && !video.notified) {
-        await sendNotification(userSettings.telegram_bot_token, userSettings.telegram_chat_id, video.title, video.link, summary);
-        await supabase.from('videos').update({ notified: true }).eq('id', id);
+      if (userSettings && userSettings.telegram_chat_id && !video.notified) {
+        const botToken = process.env.TELEGRAM_BOT_TOKEN || userSettings.telegram_bot_token;
+        if (botToken) {
+          await sendNotification(botToken, userSettings.telegram_chat_id, video.title, video.link, summary);
+          await supabase.from('videos').update({ notified: true }).eq('id', id);
+        }
       }
 
       res.json({ success: true });
@@ -255,12 +275,17 @@ export function setupRoutes(app: Express) {
     try {
       const { data: userSettings } = await client.from('user_settings').select('*').eq('user_id', user.id).single();
 
-      if (!userSettings || !userSettings.telegram_bot_token || !userSettings.telegram_chat_id) {
+      if (!userSettings || !userSettings.telegram_chat_id) {
         return res.status(400).json({ error: 'Telegram settings not configured' });
       }
 
+      const botToken = process.env.TELEGRAM_BOT_TOKEN || userSettings.telegram_bot_token;
+      if (!botToken) {
+        return res.status(400).json({ error: 'System bot token not set' });
+      }
+
       const result = await sendNotification(
-        userSettings.telegram_bot_token,
+        botToken,
         userSettings.telegram_chat_id,
         'Test Notification',
         'https://example.com',
@@ -281,62 +306,81 @@ export function setupRoutes(app: Express) {
   // Telegram Webhook
   app.post('/api/webhook/telegram', async (req, res) => {
     const { message } = req.body;
-    if (!message || !message.reply_to_message || !message.text) {
-      return res.sendStatus(200); // Only handle replies
+    if (!message || !message.text) {
+      return res.sendStatus(200);
     }
 
     const chatId = message.chat.id.toString();
-    const userQuestion = message.text;
-    const parentText = message.reply_to_message.text || '';
+    const userText = message.text.trim();
 
     try {
-      // 1. Find the video link in the parent message
-      const linkMatch = parentText.match(/https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/[^\s]+/);
-      if (!linkMatch) return res.sendStatus(200);
-      const videoLink = linkMatch[0];
-
-      // 2. Fetch user settings to get Gemini Key and Bot Token
-      const { data: userSettings } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).single();
-      if (!userSettings || !userSettings.gemini_api_key) return res.sendStatus(200);
-
-      // 3. Get Video Info & Transcript
-      let { data: video } = await supabase.from('videos').select('*').eq('link', videoLink).single();
-      if (!video) return res.sendStatus(200);
-
-      let transcript = video.transcript || "";
-      if (!transcript) {
-        transcript = await getTranscript(video.link);
-        if (transcript) {
-          await supabase.from('videos').update({ transcript }).eq('id', video.id);
+      // Handle the Magic Link /start command
+      if (userText.startsWith('/start ')) {
+        const token = userText.split(' ')[1];
+        if (token) {
+          const { data: userSettings } = await supabase.from('user_settings').select('user_id').eq('telegram_auth_token', token).single();
+          if (userSettings) {
+            await supabase.from('user_settings').update({ telegram_chat_id: chatId }).eq('user_id', userSettings.user_id);
+            await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'GlimpseAI Connected!', 'https://your-app.com', 'Your Telegram account is now successfully linked. You will receive video summaries here.');
+          } else {
+            await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Connection Failed', '', 'Invalid connection code. Please try again from the app.');
+          }
         }
+        return res.sendStatus(200);
       }
 
-      // 4. Ask Gemini
-      const ai = new GoogleGenAI({ apiKey: userSettings.gemini_api_key });
-      const prompt = `
+      // If it's a reply to an existing message (Q&A feature)
+      if (message.reply_to_message && message.reply_to_message.text) {
+        const parentText = message.reply_to_message.text;
+        const linkMatch = parentText.match(/https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/[^\s]+/);
+        if (!linkMatch) return res.sendStatus(200);
+        const videoLink = linkMatch[0];
+
+        // 2. Fetch user settings to get Gemini Key and Bot Token
+        const { data: userSettings } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).single();
+        if (!userSettings || !userSettings.gemini_api_key) return res.sendStatus(200);
+
+        // 3. Get Video Info & Transcript
+        let { data: video } = await supabase.from('videos').select('*').eq('link', videoLink).single();
+        if (!video) return res.sendStatus(200);
+
+        let transcript = video.transcript || "";
+        if (!transcript) {
+          transcript = await getTranscript(video.link);
+          if (transcript) {
+            await supabase.from('videos').update({ transcript }).eq('id', video.id);
+          }
+        }
+
+        // 4. Ask Gemini
+        const ai = new GoogleGenAI({ apiKey: userSettings.gemini_api_key });
+        const prompt = `
         You are GlimpseAI, an agentic video assistant. 
         A user is asking a question about the video: "${video.title}".
         
         Context (Transcript/Description):
         ${transcript || video.summary || "No transcript available."}
         
-        User Question: "${userQuestion}"
+        User Question: "${userText}"
         
         Provide a helpful, precise answer based strictly on the content provided. 
         If the answer isn't in the transcript, say so politely.
       `;
 
-      const aiResponse = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-      });
+        const aiResponse = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: prompt,
+        });
 
-      const answer = aiResponse.text || "I'm sorry, I couldn't process that question.";
+        const answer = aiResponse.text || "I'm sorry, I couldn't process that question.";
 
-      // 5. Reply to Telegram
-      await sendNotification(userSettings.telegram_bot_token, chatId, video.title || 'Answer', video.link || '', answer);
+        // 5. Reply to Telegram
+        await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer', video.link || '', answer);
 
-      res.sendStatus(200);
+        res.sendStatus(200);
+      } else {
+        res.sendStatus(200);
+      }
     } catch (error) {
       console.error('Telegram Webhook Error:', error);
       res.sendStatus(200); // Always return 200 to Telegram

@@ -63,7 +63,7 @@ export async function checkFeeds() {
 
               summary = response.text || "Could not generate summary.";
 
-              const botToken = settingsByUserId[channel.user_id]?.telegram_bot_token;
+              const botToken = process.env.TELEGRAM_BOT_TOKEN || settingsByUserId[channel.user_id]?.telegram_bot_token;
               const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
 
               if (botToken && chatId) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, Settings, ExternalLink, RefreshCw, Sparkles, Key, LogOut } from 'lucide-react';
+import { Trash2, Plus, Settings, ExternalLink, RefreshCw, Sparkles, Key, LogOut, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
 import { supabaseClient } from './lib/supabase';
@@ -469,111 +469,79 @@ function Dashboard({ session }: { session: Session }) {
                   </div>
                 </div>
 
-                {(!settings.telegram_bot_token || !settings.telegram_chat_id) && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm flex items-start gap-2">
-                    <span className="text-lg">⚠️</span>
-                    <div>
-                      <strong>Notifications are currently disabled.</strong>
-                    </div>
-                  </div>
-                )}
 
                 <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-4">
                     <h3 className="text-lg font-bold">Telegram Notifications</h3>
                   </div>
 
-                  <div className="text-sm text-stone-600 mb-6 bg-stone-50 p-5 rounded-xl border border-stone-200">
-                    <p className="font-bold text-base mb-3 text-stone-800">Complete Guide: Setting up Telegram Notifications</p>
-
-                    <div className="space-y-4">
+                  {settings.telegram_chat_id ? (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 text-sm mb-6 flex items-start gap-3">
+                      <div className="text-xl">✅</div>
                       <div>
-                        <p className="font-semibold text-stone-800 mb-1">Step 1: Create your own Bot</p>
-                        <ol className="list-decimal pl-4 space-y-1">
-                          <li>Open Telegram and search for <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">@BotFather</a> (make sure it has the blue verified tick).</li>
-                          <li>Click <strong>Start</strong> or send the message: <code>/newbot</code></li>
-                          <li>BotFather will ask for a name. Type any name you want (e.g., <em>My Video Summarizer</em>).</li>
-                          <li>BotFather will ask for a username. It must end in "bot" (e.g., <em>YuvaVideoBot</em>).</li>
-                          <li>BotFather will reply with a long string of text under "Use this token to access the HTTP API". <strong>Copy that entire string. That is your Bot Token.</strong></li>
-                        </ol>
-                      </div>
-
-                      <div className="border-t border-stone-200 pt-3">
-                        <p className="font-semibold text-stone-800 mb-1">Step 2: Get your personal Chat ID</p>
-                        <ol className="list-decimal pl-4 space-y-1">
-                          <li>In a new Telegram search, look for <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">@userinfobot</a>.</li>
-                          <li>Click <strong>Start</strong> or send any message.</li>
-                          <li>It will reply with your personal details. <strong>Copy the string of numbers next to "Id". That is your Chat ID.</strong></li>
-                        </ol>
-                      </div>
-
-                      <div className="border-t border-stone-200 pt-3">
-                        <p className="font-semibold text-stone-800 mb-1">Step 3: Activate your Bot</p>
-                        <ol className="list-decimal pl-4 space-y-1">
-                          <li>Search for the username you created in Step 1 (e.g., <em>@YuvaVideoBot</em>).</li>
-                          <li>Open the chat with your new bot and click the <strong>Start</strong> button at the bottom.</li>
-                          <li><em>Crucial: If you skip this step, Telegram will block the bot from sending you messages!</em></li>
-                        </ol>
+                        <p className="font-bold mb-1">Telegram Connected!</p>
+                        <p className="opacity-90">Your account is successfully linked. Curated video summaries will be sent automatically to your Telegram.</p>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Bot Token</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                        className="w-full px-3 py-2 rounded-lg border border-stone-300"
-                        value={settings.telegram_bot_token}
-                        onChange={(e) => setSettings({ ...settings, telegram_bot_token: e.target.value })}
-                      />
+                  ) : (
+                    <div className="text-sm text-stone-600 mb-6 bg-stone-50 p-6 rounded-xl border border-stone-200">
+                      <div className="flex items-start gap-4">
+                        <div className="bg-blue-100 text-blue-600 p-3 rounded-full hidden sm:block">
+                          <Send size={24} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-lg mb-2 text-stone-800">1-Click Setup</p>
+                          <p className="mb-4 text-stone-600 text-base">Click the button below to securely connect your Telegram account.</p>
+                          {settings.telegram_auth_token && (
+                            <a
+                              href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'GlimpseAI_Bot'}?start=${settings.telegram_auth_token}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-[#2AABEE] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#229ED9] inline-flex items-center gap-2 transition-colors"
+                            >
+                              <Send size={18} /> Connect Telegram
+                            </a>
+                          )}
+                          <p className="text-xs text-stone-500 mt-4 leading-relaxed">
+                            <strong>Important:</strong> Telegram will ask you to open the app. Be sure to click the big <strong>"Start"</strong> button at the bottom of the chat to complete the link!
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Your Chat ID</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 12345678"
-                        className="w-full px-3 py-2 rounded-lg border border-stone-300"
-                        value={settings.telegram_chat_id}
-                        onChange={(e) => setSettings({ ...settings, telegram_chat_id: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="pt-2 flex flex-col sm:flex-row gap-2 border-t border-stone-100 mt-4 pt-4">
-                      <button
-                        type="submit"
-                        className="bg-black text-white px-6 py-2 rounded-xl font-medium hover:bg-stone-800 w-full sm:w-auto"
-                      >
-                        Save Settings
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!settings.telegram_bot_token || !settings.telegram_chat_id) {
-                            alert('Please set and save settings first. (Make sure you clicked Save Settings!)');
-                            return;
+                  )}
+                  <div className="pt-2 flex flex-col sm:flex-row gap-2 border-t border-stone-100 mt-4 pt-4">
+                    <button
+                      type="submit"
+                      className="bg-black text-white px-6 py-2 rounded-xl font-medium hover:bg-stone-800 w-full sm:w-auto"
+                    >
+                      Save Settings
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!settings.telegram_chat_id) {
+                          alert('Please connect your Telegram first using the button above!');
+                          return;
+                        }
+                        try {
+                          const res = await fetch('/api/test-notification', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${session.access_token}` }
+                          });
+                          const data = await res.json();
+                          if (res.ok && data.success) {
+                            alert('Test sent successfully! Check your Telegram.');
+                          } else {
+                            alert(`Failed to send test. Telegram Error: ${data.error || 'Unknown error'}`);
                           }
-                          try {
-                            const res = await fetch('/api/test-notification', {
-                              method: 'POST',
-                              headers: { 'Authorization': `Bearer ${session.access_token}` }
-                            });
-                            const data = await res.json();
-                            if (res.ok && data.success) {
-                              alert('Test sent successfully! Check your Telegram.');
-                            } else {
-                              alert(`Failed to send test. Telegram Error: ${data.error || 'Unknown error'}`);
-                            }
-                          } catch (e: any) {
-                            alert(`Error sending test message: ${e.message}`);
-                          }
-                        }}
-                        className="bg-white text-black border border-stone-300 px-6 py-2 rounded-xl font-medium hover:bg-stone-50 w-full sm:w-auto"
-                      >
-                        Test Connection
-                      </button>
-                    </div>
+                        } catch (e: any) {
+                          alert(`Error sending test message: ${e.message}`);
+                        }
+                      }}
+                      className="bg-white text-black border border-stone-300 px-6 py-2 rounded-xl font-medium hover:bg-stone-50 w-full sm:w-auto"
+                    >
+                      Test Connection
+                    </button>
                   </div>
                 </div>
               </form>
