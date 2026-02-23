@@ -42,8 +42,41 @@ export async function checkFeeds() {
             videoType = 'short';
           }
 
-          // The user only wants Telegram notifications when a summary is manually generated.
-          // Therefore, we only insert the video silently into the database here.
+          let summary = "Summary unavailable.";
+          let notified = false;
+
+          const userKey = settingsByUserId[channel.user_id]?.gemini_api_key;
+          if (userKey) {
+            try {
+              const ai = new GoogleGenAI({ apiKey: userKey });
+              const prompt = `
+                Analyze the following YouTube video and provide a concise, engaging summary (under 50 words).
+                Focus on what the viewer will learn or experience.
+                Title: ${item.title}
+                Link: ${item.link}
+              `;
+
+              const response = await ai.models.generateContent({
+                model: "gemini-3-flash-preview",
+                contents: prompt,
+              });
+
+              summary = response.text || "Could not generate summary.";
+
+              const botToken = settingsByUserId[channel.user_id]?.telegram_bot_token;
+              const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
+
+              if (botToken && chatId) {
+                await sendNotification(botToken, chatId, item.title || '', item.link || '', summary);
+                notified = true;
+              }
+            } catch (err: any) {
+              console.error("Background AI Summary failed:", err);
+              summary = `AI Error: ${err.message || 'An unknown error occurred.'}`;
+            }
+          } else {
+            summary = "Summary pending generation... (Action Required: Add Gemini API Key via GlimpseAI Settings)";
+          }
 
           const { error: insertError } = await supabase.from('videos').insert({
             channel_id: channel.id,
@@ -51,9 +84,9 @@ export async function checkFeeds() {
             title: item.title,
             link: item.link,
             published_at: item.isoDate,
-            summary: "",
+            summary: summary,
             video_type: videoType,
-            notified: false
+            notified: notified
           });
 
           if (insertError) console.error("Error inserting video:", insertError);
