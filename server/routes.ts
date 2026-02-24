@@ -330,7 +330,9 @@ export function setupRoutes(app: Express) {
         const videoLink = linkMatch[0];
 
         // 2. Fetch user settings to get Gemini Key and Bot Token
-        const { data: userSettings } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).single();
+        // It's possible for one telegram Chat ID to end up on multiple rows if the user logged in/out on different devices. We grab the first valid one.
+        const { data: userSettingsList } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).not('gemini_api_key', 'is', null).limit(1);
+        const userSettings = userSettingsList && userSettingsList.length > 0 ? userSettingsList[0] : null;
         if (!userSettings || !userSettings.gemini_api_key) {
           await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', 'Error: Missing Gemini API key in user settings.');
           return res.sendStatus(200);
