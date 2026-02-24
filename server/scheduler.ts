@@ -114,7 +114,7 @@ export async function checkFeeds() {
 }
 
 export function startScheduler() {
-  cron.schedule('*/2 * * * *', () => {
+  cron.schedule('*/30 * * * *', () => {
     checkFeeds();
   });
 
