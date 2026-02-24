@@ -342,29 +342,41 @@ export function setupRoutes(app: Express) {
         }
 
         // 4. Ask Gemini
-        const ai = new GoogleGenAI({ apiKey: userSettings.gemini_api_key });
-        const prompt = `
-        You are GlimpseAI, an agentic video assistant. 
-        A user is asking a question about the video: "${video.title}".
-        
-        Context (Transcript/Description):
-        ${transcript || video.summary || "No transcript available."}
-        
-        User Question: "${userText}"
-        
-        Provide a helpful, precise answer based strictly on the content provided. 
-        If the answer isn't in the transcript, say so politely.
-      `;
+        try {
+          const ai = new GoogleGenAI({ apiKey: userSettings.gemini_api_key });
+          const prompt = `
+          You are GlimpseAI, an agentic video assistant. 
+          A user is asking a question about the video: "${video.title}".
+          
+          Context (Transcript/Description):
+          ${transcript || video.summary || "No transcript available."}
+          
+          User Question: "${userText}"
+          
+          Provide a helpful, precise answer based strictly on the content provided. 
+          If the answer isn't in the transcript, say so politely.
+        `;
 
-        const aiResponse = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: prompt,
-        });
+          const aiResponse = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt,
+          });
 
-        const answer = aiResponse.text || "I'm sorry, I couldn't process that question.";
+          const answer = aiResponse.text || "I'm sorry, I couldn't process that question.";
 
-        // 5. Reply to Telegram
-        await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer', video.link || '', answer);
+          // 5. Reply to Telegram
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer', video.link || '', answer);
+        } catch (genError: any) {
+          console.error('Q&A AI Generation Error:', genError);
+          const errMsg = typeof genError.message === 'string' ? genError.message : JSON.stringify(genError);
+          let fallbackAnswer = "An unknown error occurred while generating the response.";
+
+          if (errMsg.includes('429') || errMsg.includes('Quota exceeded') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+            fallbackAnswer = "⚠️ <b>AI Limit Hit</b>\nYou have exceeded your free Gemini API quota. Please check your billing or wait before asking more questions.";
+          }
+
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer Error', video.link || '', fallbackAnswer);
+        }
 
         res.sendStatus(200);
       } else {
