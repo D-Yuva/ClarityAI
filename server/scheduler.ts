@@ -3,6 +3,7 @@ import Parser from 'rss-parser';
 import { supabase } from './db';
 import { GoogleGenAI } from "@google/genai";
 import { sendNotification } from './notifications';
+import { getTranscript } from './transcriber';
 
 const parser = new Parser();
 
@@ -43,7 +44,11 @@ export async function checkFeeds() {
           }
 
           let summary = "Summary unavailable.";
+          let transcript = "";
           let notified = false;
+
+          // Fetch transcript before AI generation
+          transcript = await getTranscript(item.link || '');
 
           const userKey = settingsByUserId[channel.user_id]?.gemini_api_key;
           if (userKey) {
@@ -54,6 +59,9 @@ export async function checkFeeds() {
                 Focus on what the viewer will learn or experience.
                 Title: ${item.title}
                 Link: ${item.link}
+                
+                Video Transcript (Base your summary strictly on this):
+                ${transcript || "No transcript available. Infer strictly from the title."}
               `;
 
               const response = await ai.models.generateContent({
@@ -91,6 +99,7 @@ export async function checkFeeds() {
             link: item.link,
             published_at: item.isoDate,
             summary: summary,
+            transcript: transcript, // Cache transcript for Q&A
             video_type: videoType,
             notified: notified
           });
