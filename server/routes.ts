@@ -322,16 +322,34 @@ export function setupRoutes(app: Express) {
       if (message.reply_to_message && message.reply_to_message.text) {
         const parentText = message.reply_to_message.text;
         const linkMatch = parentText.match(/https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/[^\s]+/);
-        if (!linkMatch) return res.sendStatus(200);
+
+        if (!linkMatch) {
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', 'Error: No YouTube link found in the parent message text: \n' + parentText.substring(0, 100));
+          return res.sendStatus(200);
+        }
         const videoLink = linkMatch[0];
 
         // 2. Fetch user settings to get Gemini Key and Bot Token
         const { data: userSettings } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).single();
-        if (!userSettings || !userSettings.gemini_api_key) return res.sendStatus(200);
+        if (!userSettings || !userSettings.gemini_api_key) {
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', 'Error: Missing Gemini API key in user settings.');
+          return res.sendStatus(200);
+        }
 
         // 3. Get Video Info & Transcript
+        // Some RSS feeds have tracking params or http instead of https, we should use ilike or normalize it ideally, but let's see what is printed first.
         let { data: video } = await supabase.from('videos').select('*').eq('link', videoLink).single();
-        if (!video) return res.sendStatus(200);
+
+        if (!video) {
+          // If strict equality fails, try basic LIKE match to handle trailing slashes or tracking params
+          const { data: fuzzyVideo } = await supabase.from('videos').select('*').ilike('link', `${videoLink}%`).single();
+          if (fuzzyVideo) {
+            video = fuzzyVideo;
+          } else {
+            await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', `Error: Video not found in database for extracted link: ${videoLink}`);
+            return res.sendStatus(200);
+          }
+        }
 
         let transcript = video.transcript || "";
         if (!transcript) {
