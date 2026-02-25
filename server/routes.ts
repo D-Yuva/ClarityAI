@@ -365,17 +365,21 @@ export function setupRoutes(app: Express) {
         try {
           const ai = new GoogleGenAI({ apiKey: userSettings.gemini_api_key });
           const prompt = `
-          You are GlimpseAI, an agentic video assistant. 
-          A user is asking a question about the video: "${video.title}".
-          
-          Context (Transcript/Description):
-          ${transcript || video.summary || "No transcript available."}
-          
-          User Question: "${userText}"
-          
-          Provide a helpful, precise answer based strictly on the content provided. 
-          If the answer isn't in the transcript, say so politely.
-        `;
+You are GlimpseAI, an expert technical assistant designed to analyze video transcripts. 
+A user is asking a question about the video titled: "${video.title}".
+
+INSTRUCTIONS:
+1. Base your answer STRICTLY and EXCLUSIVELY on the provided transcript below. 
+2. Do NOT use outside knowledge or hallucinate details.
+3. If the transcript contains the answer, be highly specific, info-dense, and provide exact facts or quotes.
+4. If the transcript DOES NOT contain the answer, you MUST reply exactly with: "The video transcript does not mention this." Do not attempt to guess.
+
+User Question: "${userText}"
+
+--- TRANSCRIPT START ---
+${transcript || video.summary || "No transcript available."}
+--- TRANSCRIPT END ---
+`;
 
           const aiResponse = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
