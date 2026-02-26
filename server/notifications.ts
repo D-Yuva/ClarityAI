@@ -1,11 +1,11 @@
-export async function sendNotification(botToken: string, chatId: string, title: string, link: string, summary: string) {
+export async function sendNotification(botToken: string, chatId: string, title: string, link: string, textContent: string, label: string = 'Summary') {
   // Simple HTML escaping to avoid tag injection
   const escapeHTML = (str: string) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const safeTitle = escapeHTML(title || '');
-  const safeSummary = escapeHTML(summary || '');
-  const message = summary
-    ? `📺 <b>New Video Alert!</b>\n\n📌 <b>Title:</b> ${safeTitle}\n\n📝 <b>Summary:</b>\n${safeSummary}\n\n🔗 <b>Link:</b> ${link}`
+  const safeTextContent = escapeHTML(textContent || '');
+  const message = textContent
+    ? `📺 <b>New Video Alert!</b>\n\n📌 <b>Title:</b> ${safeTitle}\n\n📝 <b>${label}:</b>\n${safeTextContent}\n\n🔗 <b>Link:</b> ${link}`
     : `📺 <b>New Video Alert!</b>\n\n📌 <b>Title:</b> ${safeTitle}\n\n🔗 <b>Link:</b> ${link}`;
 
   // Priority 1: Telegram (Official, Free, Safe)

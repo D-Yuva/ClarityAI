@@ -271,7 +271,8 @@ export function setupRoutes(app: Express) {
         userSettings.telegram_chat_id,
         'Test Notification',
         'https://example.com',
-        'This is a test message to verify your Telegram settings.'
+        'This is a test message to verify your Telegram settings.',
+        'Description'
       );
 
       if (result && result.success) {
@@ -366,15 +367,15 @@ export function setupRoutes(app: Express) {
           const ai = new GoogleGenAI({ apiKey: userSettings.gemini_api_key });
           const prompt = `
 You are GlimpseAI, an expert technical assistant designed to analyze video transcripts. 
-A user is asking a question about the video titled: "${video.title}".
+A user is interacting with you regarding the video titled: "${video.title}".
 
 INSTRUCTIONS:
-1. Base your answer STRICTLY and EXCLUSIVELY on the provided transcript below. 
-2. Do NOT use outside knowledge or hallucinate details.
-3. If the transcript contains the answer, be highly specific, info-dense, and provide exact facts or quotes.
-4. If the transcript DOES NOT contain the answer, you MUST reply exactly with: "The video transcript does not mention this." Do not attempt to guess.
+1. Base your answer STRICTLY and EXCLUSIVELY on the provided transcript below. Do NOT use outside knowledge or hallucinate details.
+2. If the user asks for a summary, summary of the video, deep dive, or general overview: Provide a concise, engaging summary focusing on what the viewer will learn or experience.
+3. If the user asks a specific question: Find the answer in the transcript. Be highly specific, info-dense, and provide exact facts or quotes.
+4. If the transcript DOES NOT contain the answer to a specific question, you MUST reply exactly with: "The video transcript does not mention this." Do not attempt to guess.
 
-User Question: "${userText}"
+User Input: "${userText}"
 
 --- TRANSCRIPT START ---
 ${transcript || video.summary || "No transcript available."}

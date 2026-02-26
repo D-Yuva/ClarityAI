@@ -21,6 +21,8 @@ interface Video {
   link: string;
   published_at: string;
   video_type?: 'short' | 'longform';
+  transcript?: string;
+  qaHistory?: { question: string, answer: string }[];
 }
 
 export default function App() {
@@ -58,6 +60,8 @@ function Dashboard({ session }: { session: Session }) {
 
   const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('GEMINI_API_KEY') || '');
   const [isSummarizing, setIsSummarizing] = useState<string | null>(null);
+  const [isAsking, setIsAsking] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<{ [videoId: string]: string }>({});
 
   const [settings, setSettings] = useState({
     telegram_bot_token: '',
@@ -107,6 +111,9 @@ function Dashboard({ session }: { session: Session }) {
         Focus on what the viewer will learn or experience.
         Title: ${video.title}
         Link: ${video.link}
+
+        Video Transcript:
+        ${video.transcript || video.summary || "No transcript available. Infer strictly from title."}
       `;
 
       const response = await ai.models.generateContent({
@@ -132,6 +139,64 @@ function Dashboard({ session }: { session: Session }) {
       console.error("Summarization failed:", err);
     } finally {
       setIsSummarizing(null);
+    }
+  };
+
+  const askQuestion = async (video: Video) => {
+    if (!userApiKey) {
+      alert("Please enter your Gemini API Key in Settings first!");
+      setActiveTab('settings');
+      return;
+    }
+
+    const questionText = questions[video.id]?.trim();
+    if (!questionText) return;
+
+    setIsAsking(video.id);
+    try {
+      const ai = new GoogleGenAI({ apiKey: userApiKey });
+      const prompt = `
+        You are GlimpseAI, an expert technical assistant designed to analyze video transcripts. 
+        A user is asking a question about the video titled: "${video.title}".
+
+        INSTRUCTIONS:
+        1. Base your answer STRICTLY and EXCLUSIVELY on the provided transcript below. Do NOT use outside knowledge or hallucinate details.
+        2. If the user asks for a summary, summary of the video, deep dive, or general overview: Provide a concise, engaging summary focusing on what the viewer will learn or experience.
+        3. If the user asks a specific question: Find the answer in the transcript. Be highly specific, info-dense, and provide exact facts or quotes.
+        4. If the transcript DOES NOT contain the answer to a specific question, you MUST reply exactly with: "The video transcript does not mention this." Do not attempt to guess.
+
+        User Input: "${questionText}"
+
+        --- TRANSCRIPT START ---
+        ${video.transcript || video.summary || "No transcript available."}
+        --- TRANSCRIPT END ---
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+
+      const answerText = response.text || "Could not generate answer.";
+
+      setVideos(prev => prev.map(v => {
+        if (v.id === video.id) {
+          return {
+            ...v,
+            qaHistory: [...(v.qaHistory || []), { question: questionText, answer: answerText }]
+          };
+        }
+        return v;
+      }));
+
+      // Clear input
+      setQuestions(prev => ({ ...prev, [video.id]: "" }));
+
+    } catch (err: any) {
+      console.error("Q&A failed:", err);
+      alert("Failed to answer question. Check console.");
+    } finally {
+      setIsAsking(null);
     }
   };
 
@@ -346,7 +411,56 @@ function Dashboard({ session }: { session: Session }) {
                         </div>
                         {video.summary}
                       </div>
-                      <div className="mt-3 flex items-center gap-2 text-xs text-stone-400">
+
+                      {/* Q&A Section */}
+                      <div className="mt-4 border-t border-stone-100 pt-4">
+                        <div className="text-sm font-bold text-stone-800 mb-2 flex items-center gap-2">
+                          <Sparkles size={14} className="text-purple-600" /> Ask AI about this video
+                        </div>
+
+                        {/* Q&A History */}
+                        {video.qaHistory && video.qaHistory.length > 0 && (
+                          <div className="mb-3 space-y-3">
+                            {video.qaHistory.map((qa, i) => (
+                              <div key={i} className="text-sm space-y-1">
+                                <div className="font-medium text-stone-700 bg-stone-100 p-2 rounded-lg inline-block">
+                                  Q: {qa.question}
+                                </div>
+                                <div className="text-stone-600 pl-2 border-l-2 border-purple-200 ml-2">
+                                  {qa.answer}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Q&A Input */}
+                        <div className="flex gap-2 relative">
+                          <input
+                            type="text"
+                            placeholder="E.g., What are the key takeaways?"
+                            className="flex-1 text-sm px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-colors"
+                            value={questions[video.id] || ''}
+                            onChange={(e) => setQuestions(prev => ({ ...prev, [video.id]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') askQuestion(video);
+                            }}
+                            disabled={isAsking === video.id || (!video.summary && !video.transcript)}
+                          />
+                          <button
+                            onClick={() => askQuestion(video)}
+                            disabled={isAsking === video.id || !questions[video.id]?.trim() || (!video.summary && !video.transcript)}
+                            className="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center justify-center shrink-0"
+                          >
+                            {isAsking === video.id ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+                          </button>
+                        </div>
+                        {(!video.summary && !video.transcript) && (
+                          <p className="text-xs text-stone-400 mt-1 italic">Transcript unavailable.</p>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex items-center gap-2 text-xs text-stone-400">
                         <span>Published: {new Date(video.published_at).toLocaleString()}</span>
                         {getVideoType(video) === 'short' && (
                           <span className="bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded border border-stone-200">Short</span>

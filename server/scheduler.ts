@@ -43,52 +43,25 @@ export async function checkFeeds() {
             videoType = 'short';
           }
 
-          let summary = "Summary unavailable.";
+          let description = "Description unavailable.";
+          let descriptionMatches = item.contentSnippet || item.content;
+          if (descriptionMatches) {
+            // Take the first 300 characters of the description for the alert
+            description = typeof descriptionMatches === 'string' ? descriptionMatches.substring(0, 300) + '...' : "Description unavailable."
+          }
+
+          let summary = "";
           let transcript = "";
           let notified = false;
 
           // Fetch transcript before AI generation
           transcript = await getTranscript(item.link || '');
 
-          const userKey = settingsByUserId[channel.user_id]?.gemini_api_key;
-          if (userKey) {
-            try {
-              const ai = new GoogleGenAI({ apiKey: userKey });
-              const prompt = `
-                Analyze the following YouTube video and provide a concise, engaging summary (under 50 words).
-                Focus on what the viewer will learn or experience.
-                Title: ${item.title}
-                Link: ${item.link}
-                
-                Video Transcript (Base your summary strictly on this):
-                ${transcript || "No transcript available. Infer strictly from the title."}
-              `;
-
-              const response = await ai.models.generateContent({
-                model: "gemini-3-flash-preview",
-                contents: prompt,
-              });
-
-              summary = response.text || "Could not generate summary.";
-
-            } catch (err: any) {
-              console.error("Background AI Summary failed:", err);
-              const errMsg = typeof err.message === 'string' ? err.message : JSON.stringify(err);
-              if (errMsg.includes('429') || errMsg.includes('Quota exceeded') || errMsg.includes('RESOURCE_EXHAUSTED')) {
-                summary = "AI Limit Hit: You have exceeded your free Gemini API quota.";
-              } else {
-                summary = "AI Error: Could not generate summary.";
-              }
-            }
-          } else {
-            summary = "Summary pending generation... (Action Required: Add Gemini API Key via GlimpseAI Settings)";
-          }
-
           const botToken = process.env.TELEGRAM_BOT_TOKEN || settingsByUserId[channel.user_id]?.telegram_bot_token;
           const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
 
           if (botToken && chatId) {
-            await sendNotification(botToken, chatId, item.title || '', item.link || '', summary);
+            await sendNotification(botToken, chatId, item.title || '', item.link || '', description, 'Description');
             notified = true;
           }
 
