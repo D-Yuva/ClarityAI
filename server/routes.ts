@@ -97,6 +97,10 @@ export function setupRoutes(app: Express) {
 
       if (url.includes('youtube.com/feeds/videos.xml')) {
         rssUrl = url;
+      } else if (url.includes('reddit.com/r/')) {
+        // Handle Reddit subreddit url
+        const cleanUrl = url.split('?')[0].replace(/\/$/, "");
+        rssUrl = `${cleanUrl}.json`;
       } else {
         const $ = await fetchPage(url);
         const channelId = $('meta[itemprop="channelId"]').attr('content');
@@ -109,12 +113,17 @@ export function setupRoutes(app: Express) {
       }
 
       if (!rssUrl) {
-        return res.status(400).json({ error: 'Could not find RSS feed for this channel.' });
+        return res.status(400).json({ error: 'Could not find RSS feed or Reddit JSON for this channel.' });
       }
 
-      // 2. Verify RSS feed and get name
-      const feed = await parser.parseURL(rssUrl);
-      channelName = feed.title || 'Unknown Channel';
+      // 2. Verify RSS feed / Reddit JSON and get name
+      if (rssUrl.includes('reddit.com')) {
+        channelName = url.split('reddit.com/r/')[1]?.split('/')[0] || 'Reddit Channel';
+        channelName = `r/${channelName}`;
+      } else {
+        const feed = await parser.parseURL(rssUrl);
+        channelName = feed.title || 'Unknown Channel';
+      }
 
       // 3. Insert into DB using authenticated client (RLS automatically enforces user_id matching)
       const { data: channelData, error: insertError } = await client.from('channels').insert({
@@ -322,10 +331,10 @@ export function setupRoutes(app: Express) {
       // If it's a reply to an existing message (Q&A feature)
       if (message.reply_to_message && message.reply_to_message.text) {
         const parentText = message.reply_to_message.text;
-        const linkMatch = parentText.match(/https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/[^\s]+/);
+        const linkMatch = parentText.match(/https?:\/\/(www\.)?(youtube\.com|youtu\.be|reddit\.com\/r\/)[^\s]+/);
 
         if (!linkMatch) {
-          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', 'Error: No YouTube link found in the parent message text: \n' + parentText.substring(0, 100));
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', 'Error: No YouTube or Reddit link found in the parent message text: \n' + parentText.substring(0, 100));
           return res.sendStatus(200);
         }
         const videoLink = linkMatch[0];
@@ -416,29 +425,51 @@ ${transcript || video.summary || "No transcript available."}
 
 async function backfillVideos(client: any, channelId: string, rssUrl: string) {
   try {
-    const feed = await parser.parseURL(rssUrl);
+    let videos: any[] = [];
 
-    if (feed.items) {
-      const videos = feed.items.map(item => {
-        const videoId = item.id.split(':').pop();
-        return {
-          channel_id: channelId,
-          video_id: videoId || '',
-          title: item.title,
-          link: item.link,
-          published_at: item.isoDate,
-          notified: true // Mark backfilled as notified so we don't spam 100 historical messages
-        };
-      }).filter(v => v.video_id);
+    if (rssUrl.includes('reddit.com')) {
+      const response = await fetch(rssUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Node.js)' }
+      });
+      const json = await response.json();
 
-      // Upsert to handle ON CONFLICT DO NOTHING natively in Supabase via unique constraint
-      if (videos.length > 0) {
-        const { error } = await client.from('videos').upsert(videos, { onConflict: 'channel_id,video_id', ignoreDuplicates: true });
-        if (error) console.error("Database upsert error backfilling videos:", error);
+      if (json.data && json.data.children) {
+        videos = json.data.children.map((child: any) => {
+          const item = child.data;
+          return {
+            channel_id: channelId,
+            video_id: item.id || '',
+            title: item.title,
+            link: `https://www.reddit.com${item.permalink}`,
+            published_at: new Date(item.created_utc * 1000).toISOString(),
+            notified: true
+          };
+        }).filter((v: any) => v.video_id);
+      }
+    } else {
+      const feed = await parser.parseURL(rssUrl);
+      if (feed.items) {
+        videos = feed.items.map(item => {
+          const videoId = item.id.split(':').pop();
+          return {
+            channel_id: channelId,
+            video_id: videoId || '',
+            title: item.title,
+            link: item.link,
+            published_at: item.isoDate,
+            notified: true
+          };
+        }).filter(v => v.video_id);
       }
     }
-    console.log(`Backfilled ${feed.items?.length || 0} videos for channel ${channelId}`);
+
+    // Upsert to handle ON CONFLICT DO NOTHING natively in Supabase via unique constraint
+    if (videos.length > 0) {
+      const { error } = await client.from('videos').upsert(videos, { onConflict: 'channel_id,video_id', ignoreDuplicates: true });
+      if (error) console.error("Database upsert error backfilling items:", error);
+    }
+    console.log(`Backfilled ${videos.length} items for channel ${channelId}`);
   } catch (error) {
-    console.error(`Error backfilling videos for channel ${channelId}:`, error);
+    console.error(`Error backfilling items for channel ${channelId}:`, error);
   }
 }

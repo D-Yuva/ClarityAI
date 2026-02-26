@@ -26,11 +26,34 @@ export async function checkFeeds() {
 
   for (const channel of channels || []) {
     try {
-      const feed = await parser.parseURL(channel.rss_url);
+      let feedItems: any[] = [];
+
+      if (channel.rss_url && channel.rss_url.includes('reddit.com')) {
+        const response = await fetch(channel.rss_url, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Node.js)' }
+        });
+        const json = await response.json();
+        if (json.data && json.data.children) {
+          feedItems = json.data.children.map((child: any) => {
+            const it = child.data;
+            return {
+              id: it.id,
+              title: it.title,
+              link: `https://www.reddit.com${it.permalink}`,
+              isoDate: new Date(it.created_utc * 1000).toISOString(),
+              contentSnippet: it.selftext,
+              content: it.selftext
+            };
+          });
+        }
+      } else {
+        const feed = await parser.parseURL(channel.rss_url);
+        feedItems = feed.items;
+      }
 
       await supabase.from('channels').update({ last_checked: new Date().toISOString() }).eq('id', channel.id);
 
-      for (const item of feed.items) {
+      for (const item of feedItems) {
         const videoId = item.id;
 
         const { data: existing } = await supabase.from('videos').select('id').eq('channel_id', channel.id).eq('video_id', videoId).single();
@@ -55,13 +78,19 @@ export async function checkFeeds() {
           let notified = false;
 
           // Fetch transcript before AI generation
-          transcript = await getTranscript(item.link || '');
+          if (item.link && item.link.includes('reddit.com')) {
+            // For Reddit, we use the selftext as the primary "transcript" for Q&A
+            transcript = item.contentSnippet || item.title || '';
+          } else {
+            transcript = await getTranscript(item.link || '');
+          }
 
           const botToken = process.env.TELEGRAM_BOT_TOKEN || settingsByUserId[channel.user_id]?.telegram_bot_token;
           const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
 
           if (botToken && chatId) {
-            await sendNotification(botToken, chatId, item.title || '', item.link || '', description, 'Description');
+            const labelContent = channel.rss_url && channel.rss_url.includes('reddit.com') ? 'Post Snippet' : 'Description';
+            await sendNotification(botToken, chatId, item.title || '', item.link || '', description, labelContent);
             notified = true;
           }
 

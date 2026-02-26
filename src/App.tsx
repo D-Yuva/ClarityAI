@@ -107,13 +107,13 @@ function Dashboard({ session }: { session: Session }) {
     try {
       const ai = new GoogleGenAI({ apiKey: userApiKey });
       const prompt = `
-        Analyze the following YouTube video and provide a concise, engaging summary (under 50 words).
-        Focus on what the viewer will learn or experience.
+        Analyze the following link (video or post) and provide a concise, engaging summary (under 50 words).
+        Focus on what the viewer or reader will learn or experience.
         Title: ${video.title}
         Link: ${video.link}
 
-        Video Transcript:
-        ${video.transcript || video.summary || "No transcript available. Infer strictly from title."}
+        Content/Transcript:
+        ${video.transcript || video.summary || "No content available. Infer strictly from title."}
       `;
 
       const response = await ai.models.generateContent({
@@ -156,20 +156,20 @@ function Dashboard({ session }: { session: Session }) {
     try {
       const ai = new GoogleGenAI({ apiKey: userApiKey });
       const prompt = `
-        You are GlimpseAI, an expert technical assistant designed to analyze video transcripts. 
-        A user is asking a question about the video titled: "${video.title}".
+        You are GlimpseAI, an expert technical assistant designed to analyze transcripts and post contents. 
+        A user is asking a question about the content titled: "${video.title}".
 
         INSTRUCTIONS:
-        1. Base your answer STRICTLY and EXCLUSIVELY on the provided transcript below. Do NOT use outside knowledge or hallucinate details.
-        2. If the user asks for a summary, summary of the video, deep dive, or general overview: Provide a concise, engaging summary focusing on what the viewer will learn or experience.
-        3. If the user asks a specific question: Find the answer in the transcript. Be highly specific, info-dense, and provide exact facts or quotes.
-        4. If the transcript DOES NOT contain the answer to a specific question, you MUST reply exactly with: "The video transcript does not mention this." Do not attempt to guess.
+        1. Base your answer STRICTLY and EXCLUSIVELY on the provided transcript/content below. Do NOT use outside knowledge or hallucinate details.
+        2. If the user asks for a summary, deep dive, or general overview: Provide a concise, engaging summary focusing on what the viewer will learn or experience.
+        3. If the user asks a specific question: Find the answer in the transcript/content. Be highly specific, info-dense, and provide exact facts or quotes.
+        4. If the transcript/content DOES NOT contain the answer to a specific question, you MUST reply exactly with: "The content does not mention this." Do not attempt to guess.
 
         User Input: "${questionText}"
 
-        --- TRANSCRIPT START ---
-        ${video.transcript || video.summary || "No transcript available."}
-        --- TRANSCRIPT END ---
+        --- CONTENT START ---
+        ${video.transcript || video.summary || "No content available."}
+        --- CONTENT END ---
       `;
 
       const response = await ai.models.generateContent({
@@ -415,7 +415,7 @@ function Dashboard({ session }: { session: Session }) {
                       {/* Q&A Section */}
                       <div className="mt-4 border-t border-stone-100 pt-4">
                         <div className="text-sm font-bold text-stone-800 mb-2 flex items-center gap-2">
-                          <Sparkles size={14} className="text-purple-600" /> Ask AI about this video
+                          <Sparkles size={14} className="text-purple-600" /> Ask AI about this content
                         </div>
 
                         {/* Q&A History */}
@@ -486,7 +486,7 @@ function Dashboard({ session }: { session: Session }) {
               <form onSubmit={addChannel} className="flex gap-2">
                 <input
                   type="url"
-                  placeholder="Paste YouTube Channel URL (e.g. https://youtube.com/@channel)"
+                  placeholder="Paste YouTube Channel or Reddit URL (e.g. reddit.com/r/reactjs)"
                   className="flex-1 px-4 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-red-500"
                   value={newChannelUrl}
                   onChange={(e) => setNewChannelUrl(e.target.value)}
