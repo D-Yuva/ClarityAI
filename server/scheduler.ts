@@ -72,14 +72,6 @@ export async function checkFeeds() {
             videoType = 'short';
           }
 
-          let description = "Description unavailable.";
-          const ytDescription = item.mediaGroup ? item.mediaGroup['media:description']?.[0] : null;
-          let descriptionMatches = ytDescription || item.contentSnippet || item.content;
-          if (descriptionMatches) {
-            // Send the full description
-            description = typeof descriptionMatches === 'string' ? descriptionMatches : "Description unavailable."
-          }
-
           let summary = "";
           let transcript = "";
           let notified = false;
@@ -96,8 +88,8 @@ export async function checkFeeds() {
           const chatId = settingsByUserId[channel.user_id]?.telegram_chat_id;
 
           if (botToken && chatId) {
-            const labelContent = channel.rss_url && channel.rss_url.includes('reddit.com') ? 'Post Snippet' : 'Description';
-            await sendNotification(botToken, chatId, item.title || '', item.link || '', description, labelContent);
+            const contextType = channel.rss_url && channel.rss_url.includes('reddit.com') ? 'Reddit Post' : 'YouTube Video';
+            await sendNotification(botToken, chatId, item.title || '', item.link || '', contextType);
             notified = true;
           }
 

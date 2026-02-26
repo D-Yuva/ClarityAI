@@ -340,13 +340,13 @@ export function setupRoutes(app: Express) {
         const linkMatch = parentText.match(/https?:\/\/(www\.)?(youtube\.com|youtu\.be|reddit\.com\/r\/)[^\s]+/);
 
         if (!linkMatch) {
-          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', 'Error: No YouTube or Reddit link found in the parent message text: \n' + parentText.substring(0, 100));
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', 'Error: No YouTube or Reddit link found in the parent message text.');
           return res.sendStatus(200);
         }
+
         const videoLink = linkMatch[0];
 
         // 2. Fetch user settings to get Gemini Key and Bot Token
-        // It's possible for one telegram Chat ID to end up on multiple rows if the user logged in/out on different devices. We grab the first valid one.
         const { data: userSettingsList } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).not('gemini_api_key', 'is', null).limit(1);
         const userSettings = userSettingsList && userSettingsList.length > 0 ? userSettingsList[0] : null;
         if (!userSettings || !userSettings.gemini_api_key) {
@@ -355,11 +355,9 @@ export function setupRoutes(app: Express) {
         }
 
         // 3. Get Video Info & Transcript
-        // Some RSS feeds have tracking params or http instead of https, we should use ilike or normalize it ideally, but let's see what is printed first.
         let { data: video } = await supabase.from('videos').select('*').eq('link', videoLink).single();
 
         if (!video) {
-          // If strict equality fails, try basic LIKE match to handle trailing slashes or tracking params
           const { data: fuzzyVideo } = await supabase.from('videos').select('*').ilike('link', `${videoLink}%`).single();
           if (fuzzyVideo) {
             video = fuzzyVideo;
@@ -377,24 +375,31 @@ export function setupRoutes(app: Express) {
           }
         }
 
-        // 4. Ask Gemini
+        // 4. Handle "Total" Command for Reddit bypass
+        if (userText.trim().toLowerCase() === 'total') {
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Full Post Content', video.link || '', 'Content\n\n' + (transcript || 'No content available.'));
+          return res.sendStatus(200);
+        }
+
+        // 5. Ask Gemini
         try {
+          const isReddit = video.link.includes('reddit.com');
           const ai = new GoogleGenAI({ apiKey: userSettings.gemini_api_key });
           const prompt = `
-You are GlimpseAI, an expert technical assistant designed to analyze video transcripts. 
-A user is interacting with you regarding the video titled: "${video.title}".
+You are GlimpseAI, an expert technical assistant designed to analyze content. 
+A user is interacting with you regarding the ${isReddit ? 'Reddit post' : 'video'} titled: "${video.title}".
 
 INSTRUCTIONS:
-1. Base your answer STRICTLY and EXCLUSIVELY on the provided transcript below. Do NOT use outside knowledge or hallucinate details.
-2. If the user asks for a summary, summary of the video, deep dive, or general overview: Provide a concise, engaging summary focusing on what the viewer will learn or experience.
-3. If the user asks a specific question: Find the answer in the transcript. Be highly specific, info-dense, and provide exact facts or quotes.
-4. If the transcript DOES NOT contain the answer to a specific question, you MUST reply exactly with: "The video transcript does not mention this." Do not attempt to guess.
+1. Base your answer STRICTLY and EXCLUSIVELY on the provided content below. Do NOT use outside knowledge or hallucinate details.
+2. If the user asks for a summary, deep dive, or general overview: Provide a concise, engaging summary focusing on what the viewer/reader will learn or experience.
+3. If the user asks a specific question: Find the answer in the content. Be highly specific, info-dense, and provide exact facts or quotes.
+4. If the content DOES NOT contain the answer to a specific question, you MUST reply exactly with: "The content does not mention this." Do not attempt to guess.
 
 User Input: "${userText}"
 
---- TRANSCRIPT START ---
-${transcript || video.summary || "No transcript available."}
---- TRANSCRIPT END ---
+--- CONTENT START ---
+${transcript || video.summary || "No content available."}
+--- CONTENT END ---
 `;
 
           const aiResponse = await ai.models.generateContent({
@@ -404,8 +409,9 @@ ${transcript || video.summary || "No transcript available."}
 
           const answer = aiResponse.text || "I'm sorry, I couldn't process that question.";
 
-          // 5. Reply to Telegram
-          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer', video.link || '', answer);
+          // 6. Reply to Telegram
+          const msgType = isReddit ? 'Reddit Answer' : 'YouTube Answer';
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer', video.link || '', msgType + '\n\n' + answer);
         } catch (genError: any) {
           console.error('Q&A AI Generation Error:', genError);
           const errMsg = typeof genError.message === 'string' ? genError.message : JSON.stringify(genError);
@@ -415,12 +421,12 @@ ${transcript || video.summary || "No transcript available."}
             fallbackAnswer = "⚠️ <b>AI Limit Hit</b>\nYou have exceeded your free Gemini API quota. Please check your billing or wait before asking more questions.";
           }
 
-          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer Error', video.link || '', fallbackAnswer);
+          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer Error', video.link || '', 'Error\n\n' + fallbackAnswer);
         }
 
-        res.sendStatus(200);
+        return res.sendStatus(200);
       } else {
-        res.sendStatus(200);
+        return res.sendStatus(200);
       }
     } catch (error) {
       console.error('Telegram Webhook Error:', error);
