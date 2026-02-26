@@ -448,6 +448,7 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
             title: item.title,
             link: `https://www.reddit.com${item.permalink}`,
             published_at: new Date(item.created_utc * 1000).toISOString(),
+            transcript: item.selftext || item.title || '',
             notified: true
           };
         }).filter((v: any) => v.video_id);
@@ -455,17 +456,28 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
     } else {
       const feed = await parser.parseURL(rssUrl);
       if (feed.items) {
-        videos = (feed.items as any[]).map(item => {
+        // We only backfill 5 to avoid rate-limiting the transcript API or slowing down insertion too much
+        const recentItems = feed.items.slice(0, 5) as any[];
+        videos = await Promise.all(recentItems.map(async (item) => {
           const videoId = item.id.split(':').pop();
+
+          let transcriptStr = '';
+          try {
+            transcriptStr = await getTranscript(item.link || '');
+          } catch (e) { } // Ignore if disabled
+
           return {
             channel_id: channelId,
             video_id: videoId || '',
             title: item.title,
             link: item.link,
             published_at: item.isoDate,
+            transcript: transcriptStr,
             notified: true
           };
-        }).filter(v => v.video_id);
+        }));
+
+        videos = videos.filter(v => v.video_id);
       }
     }
 
