@@ -78,8 +78,9 @@ export async function checkFeeds() {
 
           // Fetch transcript before AI generation
           if (item.link && item.link.includes('reddit.com')) {
-            // For Reddit, we use the selftext as the primary "transcript" for Q&A
-            transcript = item.contentSnippet || item.title || '';
+            // For Reddit, the full post body is usually in item.content as HTML
+            const rawContent = item.content || item.contentSnippet || item.title || '';
+            transcript = rawContent.replace(/<[^>]*>?/gm, '').trim();
           } else {
             transcript = await getTranscript(item.link || '');
           }

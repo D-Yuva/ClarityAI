@@ -391,9 +391,18 @@ function Dashboard({ session }: { session: Session }) {
                           <ExternalLink size={18} />
                         </a>
                       </div>
-                      <div className="bg-stone-50 p-4 rounded-xl text-sm text-stone-700 leading-relaxed border border-stone-100">
-                        <div className="flex justify-between items-start mb-1">
-                          <p className="font-medium text-stone-900">AI Summary:</p>
+                      {video.summary && !video.summary.includes('unavailable') && !video.summary.includes('pending') && !video.summary.includes('failed') && (
+                        <div className="bg-stone-50 p-4 rounded-xl text-sm text-stone-700 leading-relaxed border border-stone-100">
+                          {video.summary}
+                        </div>
+                      )}
+
+                      {/* Q&A Section */}
+                      <div className="mt-4 border-t border-stone-100 pt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-sm font-bold text-stone-800 flex items-center gap-2">
+                            <Sparkles size={14} className="text-purple-600" /> Ask AI about this content
+                          </div>
                           {(!video.summary || video.summary.includes('unavailable') || video.summary.includes('pending') || video.summary.includes('failed')) && (
                             <button
                               onClick={() => generateSummary(video)}
@@ -405,17 +414,9 @@ function Dashboard({ session }: { session: Session }) {
                               ) : (
                                 <Sparkles size={12} />
                               )}
-                              {video.summary && !video.summary.includes('unavailable') && !video.summary.includes('pending') ? 'Retry' : 'Generate'}
+                              Generate Summary
                             </button>
                           )}
-                        </div>
-                        {video.summary}
-                      </div>
-
-                      {/* Q&A Section */}
-                      <div className="mt-4 border-t border-stone-100 pt-4">
-                        <div className="text-sm font-bold text-stone-800 mb-2 flex items-center gap-2">
-                          <Sparkles size={14} className="text-purple-600" /> Ask AI about this content
                         </div>
 
                         {/* Q&A History */}
