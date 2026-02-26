@@ -76,8 +76,8 @@ export async function checkFeeds() {
           const ytDescription = item.mediaGroup ? item.mediaGroup['media:description']?.[0] : null;
           let descriptionMatches = ytDescription || item.contentSnippet || item.content;
           if (descriptionMatches) {
-            // Take the first 300 characters of the description for the alert
-            description = typeof descriptionMatches === 'string' ? descriptionMatches.substring(0, 300) + '...' : "Description unavailable."
+            // Send the full description
+            description = typeof descriptionMatches === 'string' ? descriptionMatches : "Description unavailable."
           }
 
           let summary = "";
