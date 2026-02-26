@@ -5,7 +5,13 @@ import { GoogleGenAI } from "@google/genai";
 import { sendNotification } from './notifications';
 import { getTranscript } from './transcriber';
 
-const parser = new Parser();
+const parser = new Parser({
+  customFields: {
+    item: [
+      ['media:group', 'mediaGroup']
+    ]
+  }
+});
 
 export async function checkFeeds() {
   console.log('Checking feeds (Scheduler)...');
@@ -67,7 +73,8 @@ export async function checkFeeds() {
           }
 
           let description = "Description unavailable.";
-          let descriptionMatches = item.contentSnippet || item.content;
+          const ytDescription = item.mediaGroup ? item.mediaGroup['media:description']?.[0] : null;
+          let descriptionMatches = ytDescription || item.contentSnippet || item.content;
           if (descriptionMatches) {
             // Take the first 300 characters of the description for the alert
             description = typeof descriptionMatches === 'string' ? descriptionMatches.substring(0, 300) + '...' : "Description unavailable."

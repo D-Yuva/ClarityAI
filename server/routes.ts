@@ -7,7 +7,13 @@ import { createClient } from '@supabase/supabase-js';
 
 import { checkFeeds } from './scheduler';
 
-const parser = new Parser();
+const parser = new Parser({
+  customFields: {
+    item: [
+      ['media:group', 'mediaGroup']
+    ]
+  }
+});
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 
@@ -449,7 +455,7 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
     } else {
       const feed = await parser.parseURL(rssUrl);
       if (feed.items) {
-        videos = feed.items.map(item => {
+        videos = (feed.items as any[]).map(item => {
           const videoId = item.id.split(':').pop();
           return {
             channel_id: channelId,
