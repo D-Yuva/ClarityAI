@@ -307,21 +307,21 @@ function Dashboard({ session }: { session: Session }) {
   };
 
   return (
-    <div className="w-full min-h-screen bg-stone-50 text-stone-900 font-sans">
-      <header className="w-full bg-white border-b border-stone-200 sticky top-0 z-10 flex justify-center">
+    <div className="w-full min-h-screen bg-[linear-gradient(to_bottom_right,#f8fafc,#f5f5f4)] text-slate-900 font-sans selection:bg-purple-200 selection:text-purple-900 flex flex-col items-center">
+      <header className="w-full bg-white/70 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-10 flex justify-center shadow-sm">
         <div className="w-full max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">GA</div>
-            <h1 className="text-xl font-bold tracking-tight">GlimpseAI</h1>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl shadow-md flex items-center justify-center text-white font-bold tracking-tighter">GA</div>
+            <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700">GlimpseAI</h1>
           </div>
-          <nav className="flex gap-1 bg-stone-100 p-1 rounded-lg">
+          <nav className="flex gap-1 bg-slate-200/50 p-1.5 rounded-full border border-slate-200/50">
             {['feed', 'channels', 'settings'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === tab
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-stone-500 hover:text-stone-700'
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all duration-300 ${activeTab === tab
+                  ? 'bg-white text-slate-800 shadow-sm ring-1 ring-slate-900/5'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
                   }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -348,16 +348,16 @@ function Dashboard({ session }: { session: Session }) {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-6"
             >
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Latest Summaries</h2>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">Latest Summaries</h2>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={triggerRefresh}
                     disabled={isRefreshing}
-                    className="p-2 hover:bg-stone-200 rounded-full transition-colors disabled:opacity-50"
+                    className="p-2.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm hover:shadow-md hover:border-slate-300 rounded-full transition-all disabled:opacity-50"
                     title="Check for new videos now"
                   >
-                    <RefreshCw size={20} className={isRefreshing ? "animate-spin" : ""} />
+                    <RefreshCw size={18} className={isRefreshing ? "animate-spin text-purple-600" : ""} />
                   </button>
                 </div>
               </div>
@@ -373,45 +373,48 @@ function Dashboard({ session }: { session: Session }) {
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-6">
+                <div className="grid gap-6 mt-4">
                   {videos.map((video) => (
-                    <article key={video.id} className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md transition-shadow">
+                    <article key={video.id} className="bg-white/80 backdrop-blur-sm p-6 rounded-[1.5rem] shadow-sm ring-1 ring-slate-900/5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <span className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1 block">
+                          <span className="inline-block px-2.5 py-1 bg-rose-50 border border-rose-100/50 text-xs font-bold uppercase tracking-wider text-rose-600 rounded-lg mb-2 shadow-sm">
                             {video.channels?.name || 'Unknown'}
                           </span>
                           <h3 className="text-lg font-bold leading-tight">
-                            <a href={video.link} target="_blank" rel="noreferrer" className="hover:underline">
+                            <a href={video.link} target="_blank" rel="noreferrer" className="text-slate-900 hover:text-rose-600 transition-colors drop-shadow-sm">
                               {video.title}
                             </a>
                           </h3>
                         </div>
-                        <a href={video.link} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-red-600">
+                        <a href={video.link} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 p-2.5 rounded-full transition-all shrink-0">
                           <ExternalLink size={18} />
                         </a>
                       </div>
                       {video.summary && !video.summary.includes('unavailable') && !video.summary.includes('pending') && !video.summary.includes('failed') && (
-                        <div className="bg-stone-50 p-4 rounded-xl text-sm text-stone-700 leading-relaxed border border-stone-100 my-3">
+                        <div className="bg-gradient-to-br from-indigo-50/40 to-purple-50/40 p-5 rounded-2xl text-[14px] text-slate-700 leading-relaxed border border-indigo-100/50 my-4 shadow-inner">
                           {video.summary}
                         </div>
                       )}
 
                       {/* Q&A Section */}
-                      <div className="mt-4 border-t border-stone-100 pt-4">
-                        <div className="text-sm font-bold text-stone-800 mb-2 flex items-center gap-2">
-                          <Sparkles size={14} className="text-purple-600" /> Ask AI about this content
+                      <div className="mt-5 border-t border-slate-100 pt-5">
+                        <div className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                          <div className="p-1 bg-purple-100 rounded-md">
+                            <Sparkles size={14} className="text-purple-600" />
+                          </div>
+                          Ask AI about this content
                         </div>
 
                         {/* Q&A History */}
                         {video.qaHistory && video.qaHistory.length > 0 && (
-                          <div className="mb-3 space-y-3">
+                          <div className="mb-4 space-y-3">
                             {video.qaHistory.map((qa, i) => (
-                              <div key={i} className="text-sm space-y-1">
-                                <div className="font-medium text-stone-700 bg-stone-100 p-2 rounded-lg inline-block">
+                              <div key={i} className="text-sm space-y-1.5">
+                                <div className="font-medium text-slate-700 bg-slate-100/80 p-2.5 rounded-xl inline-block shadow-sm">
                                   Q: {qa.question}
                                 </div>
-                                <div className="text-stone-600 pl-2 border-l-2 border-purple-200 ml-2">
+                                <div className="text-slate-600 pl-3 border-l-2 border-purple-300 ml-2 leading-relaxed">
                                   {qa.answer}
                                 </div>
                               </div>
@@ -420,11 +423,11 @@ function Dashboard({ session }: { session: Session }) {
                         )}
 
                         {/* Q&A Input */}
-                        <div className="flex gap-2 items-center relative">
+                        <div className="flex gap-2 items-center relative mt-2">
                           <input
                             type="text"
                             placeholder="E.g., What are the key takeaways?"
-                            className="flex-1 text-sm px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-colors"
+                            className="flex-1 text-sm px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 focus:bg-white transition-all shadow-inner placeholder:text-slate-400"
                             value={questions[video.id] || ''}
                             onChange={(e) => setQuestions(prev => ({ ...prev, [video.id]: e.target.value }))}
                             onKeyDown={(e) => {
@@ -435,7 +438,7 @@ function Dashboard({ session }: { session: Session }) {
                           <button
                             onClick={() => askQuestion(video)}
                             disabled={isAsking === video.id || !questions[video.id]?.trim() || (!video.summary && !video.transcript)}
-                            className="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center justify-center shrink-0"
+                            className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-purple-700 hover:to-indigo-700 shadow-md hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center shrink-0"
                           >
                             {isAsking === video.id ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
                           </button>
@@ -443,7 +446,7 @@ function Dashboard({ session }: { session: Session }) {
                             <button
                               onClick={() => generateSummary(video)}
                               disabled={isSummarizing === video.id}
-                              className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50 flex items-center gap-1.5 text-xs font-medium shrink-0 whitespace-nowrap"
+                              className="bg-white border border-purple-200 text-purple-700 px-3.5 py-2.5 rounded-xl hover:bg-purple-50 hover:border-purple-300 shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5 text-xs font-bold shrink-0 whitespace-nowrap"
                             >
                               {isSummarizing === video.id ? (
                                 <RefreshCw className="animate-spin" size={14} />
