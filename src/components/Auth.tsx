@@ -39,37 +39,38 @@ export default function Auth({ onLogin }: { onLogin: () => void }) {
     };
 
     return (
-        <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-200 max-w-sm w-full">
-                <div className="flex items-center gap-2 mb-8 justify-center">
-                    <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">GA</div>
-                    <h1 className="text-2xl font-bold tracking-tight">GlimpseAI</h1>
+        <div className="min-h-screen bg-stone-50 flex flex-col items-center justify-center p-6 w-full">
+            <div className="w-full max-w-md bg-white p-10 md:p-12 rounded-3xl shadow-sm border border-stone-200">
+                <div className="flex flex-col items-center gap-3 mb-10">
+                    <div className="w-14 h-14 bg-red-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-sm">GA</div>
+                    <h1 className="text-3xl font-bold tracking-tight text-stone-900">GlimpseAI</h1>
+                    <p className="text-stone-500 text-center mt-1">
+                        {isRegistering ? 'Create an account to save your feeds & AI settings.' : 'Welcome back! Sign in to view your feed.'}
+                    </p>
                 </div>
 
-                <h2 className="text-xl font-bold mb-6 text-center">
-                    {isRegistering ? 'Create your account' : 'Sign in to continue'}
-                </h2>
+                {error && <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-700 rounded-xl text-sm font-medium">{error}</div>}
 
-                {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
-
-                <form onSubmit={handleAuth} className="space-y-4">
+                <form onSubmit={handleAuth} className="space-y-5">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Email</label>
+                        <label className="block text-sm font-bold text-stone-700 mb-2">Email address</label>
                         <input
                             type="email"
                             required
-                            className="w-full px-4 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="you@example.com"
+                            className="w-full px-5 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Password</label>
+                        <label className="block text-sm font-bold text-stone-700 mb-2">Password</label>
                         <input
                             type="password"
                             required
+                            placeholder="••••••••"
                             minLength={6}
-                            className="w-full px-4 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            className="w-full px-5 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                         />
@@ -77,21 +78,26 @@ export default function Auth({ onLogin }: { onLogin: () => void }) {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-black text-white px-4 py-3 flex items-center justify-center rounded-xl font-medium hover:bg-stone-800 disabled:opacity-50"
+                        className="w-full bg-stone-900 text-white px-4 py-3.5 flex items-center justify-center rounded-xl font-bold hover:bg-black transition-colors disabled:opacity-50 mt-2"
                     >
-                        {loading ? <Sparkles className="animate-spin" /> : (isRegistering ? 'Sign Up' : 'Sign In')}
+                        {loading ? <Sparkles className="animate-spin" size={20} /> : (isRegistering ? 'Create Account' : 'Sign In')}
                     </button>
                 </form>
 
-                <p className="mt-6 text-center text-sm text-stone-500">
-                    {isRegistering ? 'Already have an account?' : 'New here?'}
-                    <button
-                        onClick={() => setIsRegistering(!isRegistering)}
-                        className="ml-2 font-medium text-black hover:underline"
-                    >
-                        {isRegistering ? 'Sign in' : 'Create an account'}
-                    </button>
-                </p>
+                <div className="mt-8 pt-6 border-t border-stone-100 text-center">
+                    <p className="text-sm text-stone-500">
+                        {isRegistering ? 'Already have an account?' : "Don't have an account yet?"}
+                        <button
+                            onClick={() => {
+                                setIsRegistering(!isRegistering);
+                                setError(null);
+                            }}
+                            className="ml-2 font-bold text-stone-900 hover:text-red-600 transition-colors"
+                        >
+                            {isRegistering ? 'Sign In' : 'Sign Up'}
+                        </button>
+                    </p>
+                </div>
             </div>
         </div>
     );
