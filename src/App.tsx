@@ -16,6 +16,8 @@ interface Channel {
 
 interface Video {
   id: string;
+  channel_id?: string;
+  video_id?: string;
   title: string;
   channels?: { name: string };
   summary: string;
@@ -23,6 +25,7 @@ interface Video {
   published_at: string;
   video_type?: 'short' | 'longform';
   transcript?: string;
+  thumbnail_url?: string;
   qaHistory?: { question: string, answer: string }[];
 }
 
@@ -398,11 +401,42 @@ function Dashboard({ session }: { session: Session }) {
                               {video.title}
                             </a>
                           </h3>
+                          <div className="text-xs text-stone-500 mt-2">
+                            {new Date(video.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
                         </div>
                         <a href={video.link} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-red-600 transition-colors shrink-0">
                           <ExternalLink size={18} />
                         </a>
                       </div>
+
+                      {/* Thumbnail Rendering */}
+                      {(() => {
+                        const isYT = video.link.includes('youtube.com') || video.link.includes('youtu.be');
+                        const thumbUrl = video.thumbnail_url || (isYT ? `https://i.ytimg.com/vi/${video.video_id}/maxresdefault.jpg` : null);
+
+                        if (thumbUrl && thumbUrl !== 'self' && thumbUrl !== 'default') {
+                          return (
+                            <div className="w-full h-48 sm:h-64 mt-4 mb-4 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+                              <img
+                                src={thumbUrl}
+                                alt={video.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback for YouTube if maxresdefault doesn't exist
+                                  if (isYT && thumbUrl.includes('maxresdefault')) {
+                                    e.currentTarget.src = `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`;
+                                  } else {
+                                    e.currentTarget.style.display = 'none';
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       {video.summary && !video.summary.includes('unavailable') && !video.summary.includes('pending') && !video.summary.includes('failed') && (
                         <div className="bg-stone-50 p-4 rounded-xl text-sm text-stone-700 leading-relaxed border border-stone-100 my-3">
                           {video.summary}

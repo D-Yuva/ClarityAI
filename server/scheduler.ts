@@ -42,13 +42,24 @@ export async function checkFeeds() {
         if (json.data && json.data.children) {
           feedItems = json.data.children.map((child: any) => {
             const it = child.data;
+            let thumb = it.thumbnail;
+            if (!thumb || !thumb.startsWith('http')) {
+              let preview = it.preview?.images?.[0]?.source?.url;
+              if (preview) {
+                thumb = preview.replace(/&amp;/g, '&');
+              } else {
+                thumb = '';
+              }
+            }
+
             return {
               id: it.id,
               title: it.title,
               link: `https://www.reddit.com${it.permalink}`,
               isoDate: new Date(it.created_utc * 1000).toISOString(),
               contentSnippet: it.selftext,
-              content: it.selftext
+              content: it.selftext,
+              thumbnail_url: thumb
             };
           });
         }
@@ -145,7 +156,8 @@ export async function checkFeeds() {
             summary: summary,
             transcript: transcript, // Cache transcript for Q&A
             video_type: videoType,
-            notified: notified
+            notified: notified,
+            thumbnail_url: item.thumbnail_url || ''
           });
 
           if (insertError) console.error("Error inserting video:", insertError);

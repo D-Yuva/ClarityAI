@@ -476,6 +476,15 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
       if (json.data && json.data.children) {
         videos = json.data.children.map((child: any) => {
           const item = child.data;
+          let thumb = item.thumbnail;
+          if (!thumb || !thumb.startsWith('http')) {
+            let preview = item.preview?.images?.[0]?.source?.url;
+            if (preview) {
+              thumb = preview.replace(/&amp;/g, '&');
+            } else {
+              thumb = '';
+            }
+          }
           return {
             channel_id: channelId,
             video_id: item.id || '',
@@ -483,7 +492,8 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
             link: `https://www.reddit.com${item.permalink}`,
             published_at: new Date(item.created_utc * 1000).toISOString(),
             transcript: item.selftext || item.title || '',
-            notified: true
+            notified: true,
+            thumbnail_url: thumb
           };
         }).filter((v: any) => v.video_id);
       }
@@ -533,7 +543,8 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
               link: link,
               published_at: new Date().toISOString(),
               transcript: transcriptStr,
-              notified: true
+              notified: true,
+              thumbnail_url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
             };
           }));
           videos = videos.filter(v => v.video_id);
@@ -561,7 +572,8 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
             link: item.link,
             published_at: item.isoDate || new Date().toISOString(),
             transcript: transcriptStr,
-            notified: true
+            notified: true,
+            thumbnail_url: ''
           };
         }));
 
