@@ -3,7 +3,7 @@ export async function sendNotification(botToken: string, chatId: string, title: 
   const prefix = type.includes('Reddit') ? 'New Reddit Post' : 'New Video Alert';
 
   // Format safe for Telegram Markdown parsing
-  const message = `━━━━━━━━━━━━━━━━━━━━━\n${emoji} *${prefix}!*\n\n📌 *Title:* ${title}\n\n🔗 *Link:* ${link}\n━━━━━━━━━━━━━━━━━━━━━\n\n${type}`;
+  const message = `${emoji} *${prefix}!*\n\n📌 *Title:* ${title}\n\n🔗 *Link:* ${link}\n\n${type}`;
 
   // Priority 1: Telegram (Official, Free, Safe)
   if (botToken && chatId) {
