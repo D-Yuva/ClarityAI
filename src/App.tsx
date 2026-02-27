@@ -375,48 +375,32 @@ function Dashboard({ session }: { session: Session }) {
               ) : (
                 <div className="grid gap-6">
                   {videos.map((video) => (
-                    <article key={video.id} className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-stone-200 hover:shadow-lg transition-all duration-200">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1 pr-4">
-                          <span className="inline-block px-2.5 py-1 rounded-md bg-red-50 text-xs font-bold uppercase tracking-wider text-red-600 mb-3 border border-red-100">
+                    <article key={video.id} className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <span className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1 block">
                             {video.channels?.name || 'Unknown'}
                           </span>
-                          <h3 className="text-xl md:text-2xl font-black leading-tight tracking-tight text-stone-900">
-                            <a href={video.link} target="_blank" rel="noreferrer" className="hover:text-red-600 transition-colors">
+                          <h3 className="text-lg font-bold leading-tight">
+                            <a href={video.link} target="_blank" rel="noreferrer" className="hover:underline">
                               {video.title}
                             </a>
                           </h3>
                         </div>
-                        <a href={video.link} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-red-500 bg-stone-50 p-2 rounded-full hover:bg-red-50 transition-colors shrink-0">
+                        <a href={video.link} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-red-600">
                           <ExternalLink size={18} />
                         </a>
                       </div>
                       {video.summary && !video.summary.includes('unavailable') && !video.summary.includes('pending') && !video.summary.includes('failed') && (
-                        <div className="bg-gradient-to-br from-stone-50 to-stone-100/50 p-5 md:p-6 rounded-2xl text-[15px] text-stone-700 leading-relaxed border border-stone-100 shadow-inner my-4">
+                        <div className="bg-stone-50 p-4 rounded-xl text-sm text-stone-700 leading-relaxed border border-stone-100 my-3">
                           {video.summary}
                         </div>
                       )}
 
                       {/* Q&A Section */}
                       <div className="mt-4 border-t border-stone-100 pt-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-sm font-bold text-stone-800 flex items-center gap-2">
-                            <Sparkles size={14} className="text-purple-600" /> Ask AI about this content
-                          </div>
-                          {(!video.summary || video.summary.includes('unavailable') || video.summary.includes('pending') || video.summary.includes('failed')) && (
-                            <button
-                              onClick={() => generateSummary(video)}
-                              disabled={isSummarizing === video.id}
-                              className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-md hover:bg-purple-200 flex items-center gap-1 transition-colors disabled:opacity-50"
-                            >
-                              {isSummarizing === video.id ? (
-                                <RefreshCw className="animate-spin" size={12} />
-                              ) : (
-                                <Sparkles size={12} />
-                              )}
-                              Generate Summary
-                            </button>
-                          )}
+                        <div className="text-sm font-bold text-stone-800 mb-2 flex items-center gap-2">
+                          <Sparkles size={14} className="text-purple-600" /> Ask AI about this content
                         </div>
 
                         {/* Q&A History */}
@@ -436,11 +420,11 @@ function Dashboard({ session }: { session: Session }) {
                         )}
 
                         {/* Q&A Input */}
-                        <div className="flex gap-2 relative mt-2">
+                        <div className="flex gap-2 items-center relative">
                           <input
                             type="text"
                             placeholder="E.g., What are the key takeaways?"
-                            className="flex-1 text-sm px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all shadow-sm placeholder:text-stone-400"
+                            className="flex-1 text-sm px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-colors"
                             value={questions[video.id] || ''}
                             onChange={(e) => setQuestions(prev => ({ ...prev, [video.id]: e.target.value }))}
                             onKeyDown={(e) => {
@@ -455,6 +439,20 @@ function Dashboard({ session }: { session: Session }) {
                           >
                             {isAsking === video.id ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
                           </button>
+                          {(!video.summary || video.summary.includes('unavailable') || video.summary.includes('pending') || video.summary.includes('failed')) && (
+                            <button
+                              onClick={() => generateSummary(video)}
+                              disabled={isSummarizing === video.id}
+                              className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50 flex items-center gap-1.5 text-xs font-medium shrink-0 whitespace-nowrap"
+                            >
+                              {isSummarizing === video.id ? (
+                                <RefreshCw className="animate-spin" size={14} />
+                              ) : (
+                                <Sparkles size={14} />
+                              )}
+                              Generate Summary
+                            </button>
+                          )}
                         </div>
                         {(!video.summary && !video.transcript) && (
                           <p className="text-xs text-stone-400 mt-1 italic">Transcript unavailable.</p>
