@@ -307,11 +307,11 @@ function Dashboard({ session }: { session: Session }) {
   };
 
   return (
-    <div className="w-full min-h-screen bg-stone-100 text-stone-900 font-sans">
-      <header className="w-full bg-white border-b border-stone-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div className="w-full min-h-screen bg-stone-50 text-stone-900 font-sans flex flex-col items-center">
+      <header className="w-full bg-white border-b border-stone-200 sticky top-0 z-10 flex justify-center">
+        <div className="w-full max-w-3xl px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold">GA</div>
+            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">GA</div>
             <h1 className="text-xl font-bold tracking-tight">GlimpseAI</h1>
           </div>
           <nav className="flex gap-1 bg-stone-100 p-1 rounded-lg">
@@ -331,7 +331,7 @@ function Dashboard({ session }: { session: Session }) {
         </div>
       </header>
 
-      <main className="w-full max-w-3xl mx-auto px-4 py-8">
+      <main className="w-full max-w-3xl px-4 py-8 flex flex-col">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 flex items-center gap-2">
             <span className="text-xl">⚠️</span>

@@ -79,7 +79,7 @@ export async function checkFeeds() {
           // Fetch transcript before AI generation
           if (item.link && item.link.includes('reddit.com')) {
             // For Reddit, the full post body is usually in item.content as HTML
-            const rawContent = item.content || item.contentSnippet || item.title || '';
+            const rawContent = item.content || item.contentSnippet || '';
             transcript = rawContent.replace(/<[^>]*>?/gm, '').trim();
           } else {
             transcript = await getTranscript(item.link || '');
