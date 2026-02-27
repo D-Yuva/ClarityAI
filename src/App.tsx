@@ -307,8 +307,8 @@ function Dashboard({ session }: { session: Session }) {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[linear-gradient(to_bottom_right,#f8fafc,#f5f5f4)] text-slate-900 font-sans selection:bg-purple-200 selection:text-purple-900 flex flex-col items-center">
-      <header className="w-full bg-white/70 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-10 flex justify-center shadow-sm">
+    <div className="min-h-screen bg-[linear-gradient(to_bottom_right,#f8fafc,#f5f5f4)] text-slate-900 font-sans selection:bg-purple-200 selection:text-purple-900">
+      <header className="w-full bg-white/70 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-10 shadow-sm">
         <div className="w-full max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl shadow-md flex items-center justify-center text-white font-bold tracking-tighter">GA</div>
@@ -331,7 +331,7 @@ function Dashboard({ session }: { session: Session }) {
         </div>
       </header>
 
-      <main className="w-full max-w-3xl mx-auto px-4 py-8 flex flex-col">
+      <main className="w-full max-w-3xl mx-auto px-4 py-8">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 flex items-center gap-2">
             <span className="text-xl">⚠️</span>
