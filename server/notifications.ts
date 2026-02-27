@@ -1,13 +1,9 @@
 export async function sendNotification(botToken: string, chatId: string, title: string, link: string, type: string = 'Update') {
-  // Simple HTML escaping to avoid tag injection
-  const escapeHTML = (str: string) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  const safeTitle = escapeHTML(title || '');
   const emoji = type.includes('Reddit') ? '📝' : '📺';
   const prefix = type.includes('Reddit') ? 'New Reddit Post' : 'New Video Alert';
 
-  const message = `━━━━━━━━━━━━━━━━━━━━━\n${emoji} <b>${prefix}!</b>\n\n📌 <b>Title:</b> ${safeTitle}\n\n🔗 <b>Link:</b> ${link}\n━━━━━━━━━━━━━━━━━━━━━`;
-
+  // Format safe for Telegram Markdown parsing
+  const message = `━━━━━━━━━━━━━━━━━━━━━\n${emoji} *${prefix}!*\n\n📌 *Title:* ${title}\n\n🔗 *Link:* ${link}\n━━━━━━━━━━━━━━━━━━━━━\n\n${type}`;
 
   // Priority 1: Telegram (Official, Free, Safe)
   if (botToken && chatId) {
@@ -20,7 +16,7 @@ export async function sendNotification(botToken: string, chatId: string, title: 
         body: JSON.stringify({
           chat_id: chatId,
           text: message,
-          parse_mode: 'HTML'
+          parse_mode: 'Markdown'
         })
       });
 

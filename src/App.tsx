@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, Plus, Settings, ExternalLink, RefreshCw, Sparkles, Key, LogOut, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
+import ReactMarkdown from 'react-markdown';
 import { supabaseClient } from './lib/supabase';
 import Auth from './components/Auth';
 import { Session } from '@supabase/supabase-js';
@@ -411,8 +412,8 @@ function Dashboard({ session }: { session: Session }) {
                                 <div className="font-medium text-stone-700 bg-stone-100 p-2 rounded-lg inline-block">
                                   Q: {qa.question}
                                 </div>
-                                <div className="text-stone-600 pl-2 border-l-2 border-purple-200 ml-2">
-                                  {qa.answer}
+                                <div className="text-stone-600 pl-2 border-l-2 border-purple-200 ml-2 prose prose-sm prose-stone">
+                                  <ReactMarkdown>{qa.answer}</ReactMarkdown>
                                 </div>
                               </div>
                             ))}
