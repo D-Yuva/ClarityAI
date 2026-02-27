@@ -109,7 +109,27 @@ export function setupRoutes(app: Express) {
         rssUrl = `${cleanUrl}.json`;
       } else {
         const $ = await fetchPage(url);
-        const channelId = $('meta[itemprop="channelId"]').attr('content');
+
+        // Attempt 1: Modern YouTube HTML holds the externalId deep in script tags or meta tags
+        let channelId = $('meta[itemprop="channelId"]').attr('content');
+
+        if (!channelId) {
+          // Attempt 2: Extract from the canonical link
+          const canonicalLink = $('link[rel="canonical"]').attr('href');
+          if (canonicalLink && canonicalLink.includes('/channel/')) {
+            channelId = canonicalLink.split('/channel/')[1];
+          }
+        }
+
+        if (!channelId) {
+          // Attempt 3: Regex raw HTML for the common ytInitialData or externalId structure
+          const htmlContent = $.html();
+          const match = htmlContent.match(/"externalId":"(UC[a-zA-Z0-9_-]{22})"/);
+          if (match && match[1]) {
+            channelId = match[1];
+          }
+        }
+
         if (channelId) {
           rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
         } else {
