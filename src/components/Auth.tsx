@@ -15,7 +15,13 @@ export default function Auth({ onLogin }: { onLogin: () => void }) {
         setError(null);
         try {
             let { error: authError } = isRegistering
-                ? await supabaseClient.auth.signUp({ email, password })
+                ? await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        emailRedirectTo: 'https://ai-glimpse.up.railway.app/'
+                    }
+                })
                 : await supabaseClient.auth.signInWithPassword({ email, password });
 
             if (authError) throw authError;
