@@ -82,8 +82,8 @@ function Dashboard({ session }: { session: Session }) {
     };
     init();
 
-    // Poll for new videos every 30s
-    const interval = setInterval(fetchVideos, 30000);
+    // Poll for new videos every 30 mins (1800000 ms)
+    const interval = setInterval(fetchVideos, 1800000);
     return () => clearInterval(interval);
   }, []);
 
@@ -361,7 +361,7 @@ function Dashboard({ session }: { session: Session }) {
               className="space-y-6"
             >
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-2xl font-bold text-stone-900">Latest Summaries</h2>
+                <h2 className="text-2xl font-bold text-stone-900">Feed</h2>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={triggerRefresh}
