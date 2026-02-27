@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
-html, body, #root {
+html,
+body {
   width: 100%;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  background-color: #fafaf9;
+  /* stone-50 */
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
