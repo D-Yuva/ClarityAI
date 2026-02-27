@@ -146,6 +146,14 @@ export function setupRoutes(app: Express) {
       if (rssUrl.includes('reddit.com')) {
         channelName = url.split('reddit.com/r/')[1]?.split('/')[0] || 'Reddit Channel';
         channelName = `r/${channelName}`;
+      } else if (rssUrl.includes('youtube.com')) {
+        let ytUrl = rssUrl;
+        if (ytUrl.includes('/feeds/videos.xml?channel_id=')) {
+          ytUrl = `https://www.youtube.com/channel/${ytUrl.split('channel_id=')[1]}`;
+          rssUrl = ytUrl; // Update DB to store modern URL format
+        }
+        const $ = await fetchPage(ytUrl);
+        channelName = $('meta[property="og:title"]').attr('content') || $('title').text().replace(' - YouTube', '') || 'Unknown Channel';
       } else {
         const feed = await parser.parseURL(rssUrl);
         channelName = feed.title || 'Unknown Channel';
@@ -479,6 +487,60 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
           };
         }).filter((v: any) => v.video_id);
       }
+    } else if (rssUrl.includes('youtube.com')) {
+      let ytUrl = rssUrl;
+      if (ytUrl.includes('/feeds/videos.xml?channel_id=')) {
+        ytUrl = `https://www.youtube.com/channel/${ytUrl.split('channel_id=')[1]}`;
+      }
+
+      try {
+        const response = await fetch(ytUrl);
+        const text = await response.text();
+        const match = text.match(/var ytInitialData = ({.*?});<\/script>/);
+        if (match) {
+          const data = JSON.parse(match[1]);
+          let videoItems: any[] = [];
+          JSON.stringify(data, (key, value) => {
+            if (key === 'gridVideoRenderer' || key === 'videoRenderer' || key === 'richItemRenderer') {
+              if (value?.content?.videoRenderer) {
+                videoItems.push(value.content.videoRenderer);
+              } else if (value?.videoId) {
+                videoItems.push(value);
+              }
+            }
+            return value;
+          });
+
+          const seenIds = new Set();
+          const recentItems = videoItems.filter(v => {
+            if (!v.videoId || seenIds.has(v.videoId)) return false;
+            seenIds.add(v.videoId);
+            return true;
+          }).slice(0, 5);
+
+          videos = await Promise.all(recentItems.map(async (v) => {
+            const videoId = v.videoId;
+            const link = `https://www.youtube.com/watch?v=${videoId}`;
+            let transcriptStr = '';
+            try {
+              transcriptStr = await getTranscript(link);
+            } catch (e) { }
+
+            return {
+              channel_id: channelId,
+              video_id: videoId || '',
+              title: v.title?.runs?.[0]?.text || v.title?.simpleText || 'Unknown Video',
+              link: link,
+              published_at: new Date().toISOString(),
+              transcript: transcriptStr,
+              notified: true
+            };
+          }));
+          videos = videos.filter(v => v.video_id);
+        }
+      } catch (ytErr) {
+        console.error('YouTube scraper failed for', ytUrl, ytErr);
+      }
     } else {
       const feed = await parser.parseURL(rssUrl);
       if (feed.items) {
@@ -497,7 +559,7 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
             video_id: videoId || '',
             title: item.title,
             link: item.link,
-            published_at: item.isoDate,
+            published_at: item.isoDate || new Date().toISOString(),
             transcript: transcriptStr,
             notified: true
           };

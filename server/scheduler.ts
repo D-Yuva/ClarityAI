@@ -52,6 +52,48 @@ export async function checkFeeds() {
             };
           });
         }
+      } else if (channel.rss_url && channel.rss_url.includes('youtube.com')) {
+        let ytUrl = channel.rss_url;
+        // Convert old RSS urls to standard channel urls so we can scrape the HTML
+        if (ytUrl.includes('/feeds/videos.xml?channel_id=')) {
+          ytUrl = `https://www.youtube.com/channel/${ytUrl.split('channel_id=')[1]}`;
+        }
+
+        try {
+          const response = await fetch(ytUrl);
+          const text = await response.text();
+          const match = text.match(/var ytInitialData = ({.*?});<\/script>/);
+          if (match) {
+            const data = JSON.parse(match[1]);
+            let videos: any[] = [];
+            JSON.stringify(data, (key, value) => {
+              if (key === 'gridVideoRenderer' || key === 'videoRenderer' || key === 'richItemRenderer') {
+                if (value?.content?.videoRenderer) {
+                  videos.push(value.content.videoRenderer);
+                } else if (value?.videoId) {
+                  videos.push(value);
+                }
+              }
+              return value;
+            });
+
+            // Deduplicate by videoId and convert to standardized item structure
+            const seenIds = new Set();
+            feedItems = videos.filter(v => {
+              if (!v.videoId || seenIds.has(v.videoId)) return false;
+              seenIds.add(v.videoId);
+              return true;
+            }).slice(0, 15).map((v: any) => ({
+              id: v.videoId,
+              title: v.title?.runs?.[0]?.text || v.title?.simpleText || 'Unknown Video',
+              link: `https://www.youtube.com/watch?v=${v.videoId}`,
+              isoDate: new Date().toISOString(),
+              contentSnippet: v.descriptionSnippet?.runs?.[0]?.text || ''
+            }));
+          }
+        } catch (ytErr) {
+          console.error('YouTube scraper failed for', ytUrl, ytErr);
+        }
       } else {
         const feed = await parser.parseURL(channel.rss_url);
         feedItems = feed.items;
