@@ -224,7 +224,18 @@ function Dashboard({ session }: { session: Session }) {
       console.error("Supabase error fetching videos:", error);
     }
 
-    if (data) setVideos(data as any[]);
+    if (data) {
+      setVideos(prevVideos => {
+        // Deep merge fresh data with existing local UI state (like qaHistory)
+        return (data as any[]).map(newVideo => {
+          const existingVideo = prevVideos.find(v => v.id === newVideo.id);
+          if (existingVideo && existingVideo.qaHistory) {
+            return { ...newVideo, qaHistory: existingVideo.qaHistory };
+          }
+          return newVideo;
+        });
+      });
+    }
   };
 
   const fetchSettings = async () => {
