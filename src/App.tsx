@@ -307,9 +307,9 @@ function Dashboard({ session }: { session: Session }) {
   };
 
   return (
-    <div className="w-full min-h-screen bg-stone-50 text-stone-900 font-sans flex flex-col items-center">
+    <div className="w-full min-h-screen bg-stone-50 text-stone-900 font-sans">
       <header className="w-full bg-white border-b border-stone-200 sticky top-0 z-10 flex justify-center">
-        <div className="w-full max-w-3xl px-4 h-16 flex items-center justify-between">
+        <div className="w-full max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">GA</div>
             <h1 className="text-xl font-bold tracking-tight">GlimpseAI</h1>
@@ -331,7 +331,7 @@ function Dashboard({ session }: { session: Session }) {
         </div>
       </header>
 
-      <main className="w-full max-w-3xl px-4 py-8 flex flex-col">
+      <main className="w-full max-w-3xl mx-auto px-4 py-8 flex flex-col">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 flex items-center gap-2">
             <span className="text-xl">⚠️</span>
@@ -375,24 +375,24 @@ function Dashboard({ session }: { session: Session }) {
               ) : (
                 <div className="grid gap-6">
                   {videos.map((video) => (
-                    <article key={video.id} className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <span className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1 block">
+                    <article key={video.id} className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-stone-200 hover:shadow-lg transition-all duration-200">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1 pr-4">
+                          <span className="inline-block px-2.5 py-1 rounded-md bg-red-50 text-xs font-bold uppercase tracking-wider text-red-600 mb-3 border border-red-100">
                             {video.channels?.name || 'Unknown'}
                           </span>
-                          <h3 className="text-lg font-bold leading-tight">
-                            <a href={video.link} target="_blank" rel="noreferrer" className="hover:underline">
+                          <h3 className="text-xl md:text-2xl font-black leading-tight tracking-tight text-stone-900">
+                            <a href={video.link} target="_blank" rel="noreferrer" className="hover:text-red-600 transition-colors">
                               {video.title}
                             </a>
                           </h3>
                         </div>
-                        <a href={video.link} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-red-600">
+                        <a href={video.link} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-red-500 bg-stone-50 p-2 rounded-full hover:bg-red-50 transition-colors shrink-0">
                           <ExternalLink size={18} />
                         </a>
                       </div>
                       {video.summary && !video.summary.includes('unavailable') && !video.summary.includes('pending') && !video.summary.includes('failed') && (
-                        <div className="bg-stone-50 p-4 rounded-xl text-sm text-stone-700 leading-relaxed border border-stone-100">
+                        <div className="bg-gradient-to-br from-stone-50 to-stone-100/50 p-5 md:p-6 rounded-2xl text-[15px] text-stone-700 leading-relaxed border border-stone-100 shadow-inner my-4">
                           {video.summary}
                         </div>
                       )}
@@ -436,11 +436,11 @@ function Dashboard({ session }: { session: Session }) {
                         )}
 
                         {/* Q&A Input */}
-                        <div className="flex gap-2 relative">
+                        <div className="flex gap-2 relative mt-2">
                           <input
                             type="text"
                             placeholder="E.g., What are the key takeaways?"
-                            className="flex-1 text-sm px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-colors"
+                            className="flex-1 text-sm px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all shadow-sm placeholder:text-stone-400"
                             value={questions[video.id] || ''}
                             onChange={(e) => setQuestions(prev => ({ ...prev, [video.id]: e.target.value }))}
                             onKeyDown={(e) => {
