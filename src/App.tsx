@@ -425,7 +425,7 @@ function Dashboard({ session }: { session: Session }) {
                                 referrerPolicy="no-referrer"
                                 onError={(e) => {
                                   // Fallback for YouTube if maxresdefault doesn't exist
-                                  if (isYT && thumbUrl.includes('maxresdefault')) {
+                                  if (isYT && e.currentTarget.src.includes('maxresdefault')) {
                                     e.currentTarget.src = `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`;
                                   } else {
                                     e.currentTarget.style.display = 'none';
