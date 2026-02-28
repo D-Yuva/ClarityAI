@@ -291,6 +291,34 @@ export function setupRoutes(app: Express) {
     }
   });
 
+  // Proxy image requests to bypass CORS/referrer strictness on Railway
+  app.get('/api/image-proxy', async (req, res) => {
+    const imageUrl = req.query.url as string;
+    if (!imageUrl) return res.status(400).send('URL is required');
+
+    try {
+      const response = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+        }
+      });
+
+      if (!response.ok) {
+        return res.status(response.status).send('Failed to fetch image');
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      console.error('Image proxy error:', error);
+      res.status(500).send('Error proxying image');
+    }
+  });
+
   // Test Notification
   app.post('/api/test-notification', async (req, res) => {
     const client = getAuthClient(req);
@@ -314,8 +342,7 @@ export function setupRoutes(app: Express) {
         userSettings.telegram_chat_id,
         'Test Notification',
         'https://example.com',
-        'This is a test message to verify your Telegram settings.',
-        'Description'
+        'This is a test message to verify your Telegram settings.'
       );
 
       if (result && result.success) {
