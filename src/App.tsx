@@ -422,6 +422,7 @@ function Dashboard({ session }: { session: Session }) {
                                 src={thumbUrl}
                                 alt={video.title}
                                 className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
                                 onError={(e) => {
                                   // Fallback for YouTube if maxresdefault doesn't exist
                                   if (isYT && thumbUrl.includes('maxresdefault')) {
