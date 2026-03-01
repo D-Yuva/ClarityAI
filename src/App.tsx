@@ -423,8 +423,9 @@ function Dashboard({ session }: { session: Session }) {
                                 alt={video.title}
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
-                                crossOrigin="anonymous"
+                                onLoad={() => console.log('Image loaded successfully:', video.title, thumbUrl)}
                                 onError={(e) => {
+                                  console.log('Image load failed, attempting fallback for:', video.title, thumbUrl, e.currentTarget.src);
                                   // Fallback for YouTube if maxresdefault doesn't exist
                                   if (isYT && e.currentTarget.src.includes('maxresdefault')) {
                                     e.currentTarget.src = `https://wsrv.nl/?url=${encodeURIComponent(`https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`)}`;
@@ -436,6 +437,7 @@ function Dashboard({ session }: { session: Session }) {
                             </div>
                           );
                         }
+
                         return null;
                       })()}
 
