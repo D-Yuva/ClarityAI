@@ -419,7 +419,7 @@ function Dashboard({ session }: { session: Session }) {
                           return (
                             <div className="w-full h-48 sm:h-64 mt-4 mb-4 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
                               <img
-                                src={`https://wsrv.nl/?url=${encodeURIComponent(thumbUrl)}`}
+                                src={`https://wsrv.nl/?url=${encodeURIComponent(thumbUrl.replace(/&amp;/g, '&'))}`}
                                 alt={video.title}
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
