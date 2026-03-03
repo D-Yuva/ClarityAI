@@ -477,7 +477,7 @@ ${transcript || video.summary || "No content available."}
 `;
 
           const aiResponse = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-3.1-pro-preview",
             contents: prompt,
           });
 
