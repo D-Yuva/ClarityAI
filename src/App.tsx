@@ -417,18 +417,18 @@ function Dashboard({ session }: { session: Session }) {
 
                         if (thumbUrl && thumbUrl !== 'self' && thumbUrl !== 'default') {
                           return (
-                            <div className="w-full h-48 sm:h-64 mt-4 mb-4 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+                            <div className="w-full h-48 sm:h-64 mt-4 mb-4 rounded-xl overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center">
                               <img
-                                src={`https://wsrv.nl/?url=${encodeURIComponent(thumbUrl.replace(/&amp;/g, '&'))}`}
+                                src={`https://wsrv.nl/?url=${encodeURIComponent(thumbUrl.replace(/&amp;/g, '&'))}&w=800&fit=contain&output=webp`}
                                 alt={video.title}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                                 referrerPolicy="no-referrer"
                                 onLoad={() => console.log('Image loaded successfully:', video.title, thumbUrl)}
                                 onError={(e) => {
                                   console.log('Image load failed, attempting fallback for:', video.title, thumbUrl, e.currentTarget.src);
                                   // Fallback for YouTube if maxresdefault doesn't exist
                                   if (isYT && e.currentTarget.src.includes('maxresdefault')) {
-                                    e.currentTarget.src = `https://wsrv.nl/?url=${encodeURIComponent(`https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`)}`;
+                                    e.currentTarget.src = `https://wsrv.nl/?url=${encodeURIComponent(`https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`)}&w=800&fit=contain&output=webp`;
                                   } else {
                                     e.currentTarget.style.display = 'none';
                                   }
