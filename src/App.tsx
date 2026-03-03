@@ -476,14 +476,14 @@ function Dashboard({ session }: { session: Session }) {
                         <div className="flex gap-2 items-center relative mt-2">
                           <input
                             type="text"
-                            placeholder="E.g., What are the key takeaways?"
+                            placeholder={(!video.summary && !video.transcript) ? "Generate a summary first to enable Q&A" : "E.g., What are the key takeaways?"}
                             className="flex-1 text-sm px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-colors"
                             value={questions[video.id] || ''}
                             onChange={(e) => setQuestions(prev => ({ ...prev, [video.id]: e.target.value }))}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') askQuestion(video);
                             }}
-                            disabled={isAsking === video.id || (!video.summary && !video.transcript)}
+                            disabled={isAsking === video.id}
                           />
                           <button
                             onClick={() => askQuestion(video)}
@@ -507,9 +507,7 @@ function Dashboard({ session }: { session: Session }) {
                             </button>
                           )}
                         </div>
-                        {(!video.summary && !video.transcript) && (
-                          <p className="text-xs text-stone-400 mt-1 italic">Transcript unavailable.</p>
-                        )}
+
                       </div>
 
                       <div className="mt-4 flex items-center gap-2 text-xs text-stone-400">
