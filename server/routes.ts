@@ -46,6 +46,24 @@ async function setTelegramWebhook(botToken: string) {
 
 // Helper to register global webhook on startup
 export async function bootstrapWebhooks() {
+  // Auto-migrate YouTube channels that were saved with the wrong rss_url (channel page URL instead of XML feed URL)
+  try {
+    const { data: channels } = await supabase.from('channels').select('id, name, rss_url');
+    if (channels) {
+      for (const ch of channels) {
+        // Detect channels stored with the HTML channel page URL (not the XML feed)
+        const match = (ch.rss_url || '').match(/youtube\.com\/channel\/(UC[a-zA-Z0-9_-]+)/);
+        if (match) {
+          const correctRssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${match[1]}`;
+          await supabase.from('channels').update({ rss_url: correctRssUrl }).eq('id', ch.id);
+          console.log(`[Migration] Fixed rss_url for channel "${ch.name}": ${ch.rss_url} → ${correctRssUrl}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Migration] Failed to migrate YouTube channel rss_urls:', err);
+  }
+
   const globalBotToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!globalBotToken) {
     console.log("No global TELEGRAM_BOT_TOKEN found. Skipping global webhook bootstrap.");
@@ -147,10 +165,11 @@ export function setupRoutes(app: Express) {
         channelName = url.split('reddit.com/r/')[1]?.split('/')[0] || 'Reddit Channel';
         channelName = `r/${channelName}`;
       } else if (rssUrl.includes('youtube.com')) {
+        // Keep rssUrl as the XML feed URL for the DB — only ytUrl is used locally to fetch the channel name
         let ytUrl = rssUrl;
-        if (ytUrl.includes('/feeds/videos.xml?channel_id=')) {
-          ytUrl = `https://www.youtube.com/channel/${ytUrl.split('channel_id=')[1]}`;
-          rssUrl = ytUrl; // Update DB to store modern URL format
+        if (rssUrl.includes('/feeds/videos.xml?channel_id=')) {
+          ytUrl = `https://www.youtube.com/channel/${rssUrl.split('channel_id=')[1]}`;
+          // NOTE: do NOT overwrite rssUrl here — we want to store the XML feed URL in the DB
         }
         const $ = await fetchPage(ytUrl);
         channelName = $('meta[property="og:title"]').attr('content') || $('title').text().replace(' - YouTube', '') || 'Unknown Channel';
@@ -495,7 +514,9 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
     let videos: any[] = [];
 
     if (rssUrl.includes('reddit.com')) {
-      const response = await fetch(rssUrl, {
+      // Use sort=new to get the latest posts, not viral old "hot" ones
+      const redditNewUrl = rssUrl.includes('?') ? `${rssUrl}&sort=new&limit=50` : `${rssUrl}?sort=new&limit=50`;
+      const response = await fetch(redditNewUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Node.js)' }
       });
       const json = await response.json();
@@ -503,14 +524,12 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
       if (json.data && json.data.children) {
         videos = json.data.children.map((child: any) => {
           const item = child.data;
-          let thumb = item.thumbnail;
+          let thumb = item.preview?.images?.[0]?.source?.url || item.thumbnail;
+          if (thumb) {
+            thumb = thumb.replace(/&amp;/g, '&');
+          }
           if (!thumb || !thumb.startsWith('http')) {
-            let preview = item.preview?.images?.[0]?.source?.url;
-            if (preview) {
-              thumb = preview.replace(/&amp;/g, '&');
-            } else {
-              thumb = '';
-            }
+            thumb = '';
           }
           return {
             channel_id: channelId,
@@ -525,59 +544,34 @@ async function backfillVideos(client: any, channelId: string, rssUrl: string) {
         }).filter((v: any) => v.video_id);
       }
     } else if (rssUrl.includes('youtube.com')) {
-      let ytUrl = rssUrl;
-      if (ytUrl.includes('/feeds/videos.xml?channel_id=')) {
-        ytUrl = `https://www.youtube.com/channel/${ytUrl.split('channel_id=')[1]}`;
-      }
-
+      // Use the clean RSS XML feed URL stored in the DB
       try {
-        const response = await fetch(ytUrl);
-        const text = await response.text();
-        const match = text.match(/var ytInitialData = ({.*?});<\/script>/);
-        if (match) {
-          const data = JSON.parse(match[1]);
-          let videoItems: any[] = [];
-          JSON.stringify(data, (key, value) => {
-            if (key === 'gridVideoRenderer' || key === 'videoRenderer' || key === 'richItemRenderer') {
-              if (value?.content?.videoRenderer) {
-                videoItems.push(value.content.videoRenderer);
-              } else if (value?.videoId) {
-                videoItems.push(value);
-              }
-            }
-            return value;
-          });
+        const feed = await parser.parseURL(rssUrl);
+        const recentItems = (feed.items || []).slice(0, 10);
 
-          const seenIds = new Set();
-          const recentItems = videoItems.filter(v => {
-            if (!v.videoId || seenIds.has(v.videoId)) return false;
-            seenIds.add(v.videoId);
-            return true;
-          }).slice(0, 5);
+        videos = await Promise.all(recentItems.map(async (item: any) => {
+          // YouTube RSS item id format: "yt:video:VIDEO_ID"
+          const videoId = (item.id || '').split(':').pop() || '';
+          const link = item.link || `https://www.youtube.com/watch?v=${videoId}`;
+          let transcriptStr = '';
+          try {
+            transcriptStr = await getTranscript(link);
+          } catch (e) { }
 
-          videos = await Promise.all(recentItems.map(async (v) => {
-            const videoId = v.videoId;
-            const link = `https://www.youtube.com/watch?v=${videoId}`;
-            let transcriptStr = '';
-            try {
-              transcriptStr = await getTranscript(link);
-            } catch (e) { }
-
-            return {
-              channel_id: channelId,
-              video_id: videoId || '',
-              title: v.title?.runs?.[0]?.text || v.title?.simpleText || 'Unknown Video',
-              link: link,
-              published_at: new Date().toISOString(),
-              transcript: transcriptStr,
-              notified: true,
-              thumbnail_url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
-            };
-          }));
-          videos = videos.filter(v => v.video_id);
-        }
+          return {
+            channel_id: channelId,
+            video_id: videoId,
+            title: item.title || 'Unknown Video',
+            link: link,
+            published_at: item.isoDate || new Date().toISOString(),
+            transcript: transcriptStr,
+            notified: true,
+            thumbnail_url: videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : ''
+          };
+        }));
+        videos = videos.filter(v => v.video_id);
       } catch (ytErr) {
-        console.error('YouTube scraper failed for', ytUrl, ytErr);
+        console.error('YouTube RSS parse failed for backfill', rssUrl, ytErr);
       }
     } else {
       const feed = await parser.parseURL(rssUrl);
