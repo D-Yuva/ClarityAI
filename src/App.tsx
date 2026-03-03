@@ -416,24 +416,24 @@ function Dashboard({ session }: { session: Session }) {
                         const thumbUrl = video.thumbnail_url || (isYT ? `https://i.ytimg.com/vi/${video.video_id}/maxresdefault.jpg` : null);
 
                         if (thumbUrl && thumbUrl !== 'self' && thumbUrl !== 'default') {
-                          // Clean the URL properly before CDN proxy processing
+                          // Clean the URL properly
                           const cleanThumbUrl = thumbUrl.replace(/&amp;/gi, '&');
+                          // Route through our own backend proxy to avoid CORS/referrer issues and preserve quality
+                          const proxiedSrc = `/api/image-proxy?url=${encodeURIComponent(cleanThumbUrl)}`;
 
                           return (
-                            <div className="w-full h-48 sm:h-64 mt-4 mb-4 rounded-xl overflow-hidden bg-black/5 border border-stone-200 flex items-center justify-center relative">
+                            <div className="w-full mt-4 mb-4 rounded-xl overflow-hidden border border-stone-200" style={{ aspectRatio: '16/9' }}>
                               <img
-                                src={`https://wsrv.nl/?url=${encodeURIComponent(cleanThumbUrl)}&w=800&fit=contain&output=webp`}
+                                src={proxiedSrc}
                                 alt={video.title}
-                                className="w-full h-full object-contain p-2"
-                                referrerPolicy="no-referrer"
-                                onLoad={() => console.log('Image loaded successfully:', video.title, thumbUrl)}
+                                className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  console.log('Image load failed, attempting fallback for:', video.title, thumbUrl, e.currentTarget.src);
-                                  // Fallback for YouTube if maxresdefault doesn't exist
-                                  if (isYT && e.currentTarget.src.includes('maxresdefault')) {
-                                    e.currentTarget.src = `https://wsrv.nl/?url=${encodeURIComponent(`https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`)}&w=800&fit=contain&output=webp`;
+                                  // Fallback for YouTube if maxresdefault doesn't exist — try hqdefault
+                                  if (isYT && cleanThumbUrl.includes('maxresdefault')) {
+                                    const fallbackUrl = `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`;
+                                    e.currentTarget.src = `/api/image-proxy?url=${encodeURIComponent(fallbackUrl)}`;
                                   } else {
-                                    e.currentTarget.style.display = 'none';
+                                    (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
                                   }
                                 }}
                               />
