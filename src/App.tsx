@@ -121,7 +121,7 @@ function Dashboard({ session }: { session: Session }) {
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
       });
 
@@ -177,7 +177,7 @@ function Dashboard({ session }: { session: Session }) {
       `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         contents: prompt,
       });
 
@@ -198,7 +198,7 @@ function Dashboard({ session }: { session: Session }) {
 
     } catch (err: any) {
       console.error("Q&A failed:", err);
-      alert("Failed to answer question. Check console.");
+      alert(`Failed to answer question: ${err?.message || err}`);
     } finally {
       setIsAsking(null);
     }
