@@ -420,11 +420,11 @@ function Dashboard({ session }: { session: Session }) {
                           const cleanThumbUrl = thumbUrl.replace(/&amp;/gi, '&');
 
                           return (
-                            <div className="w-full h-48 sm:h-64 mt-4 mb-4 rounded-xl overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center">
+                            <div className="w-full h-48 sm:h-64 mt-4 mb-4 rounded-xl overflow-hidden bg-black/5 border border-stone-200 flex items-center justify-center relative">
                               <img
                                 src={`https://wsrv.nl/?url=${encodeURIComponent(cleanThumbUrl)}&w=800&fit=contain&output=webp`}
                                 alt={video.title}
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-contain p-2"
                                 referrerPolicy="no-referrer"
                                 onLoad={() => console.log('Image loaded successfully:', video.title, thumbUrl)}
                                 onError={(e) => {
