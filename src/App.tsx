@@ -323,30 +323,30 @@ function Dashboard({ session }: { session: Session }) {
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans">
-      <header className="w-full bg-white border-b border-stone-200 sticky top-0 z-10 shadow-sm">
-        <div className="w-full max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl">
+        <div className="bg-white/80 backdrop-blur-md border border-stone-200/50 shadow-xl rounded-2xl px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">GA</div>
-            <h1 className="text-xl font-bold tracking-tight text-stone-900">GlimpseAI</h1>
+            <div className="w-7 h-7 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">GA</div>
+            <h1 className="text-lg font-bold tracking-tight text-stone-900 hidden sm:block">GlimpseAI</h1>
           </div>
-          <nav className="flex gap-1 bg-stone-100 p-1 rounded-lg">
+          <nav className="flex gap-1 bg-stone-100/50 p-1 rounded-xl">
             {['feed', 'channels', 'settings'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === tab
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${activeTab === tab
                   ? 'bg-white text-black shadow-sm'
                   : 'text-stone-500 hover:text-stone-700'
                   }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab}
               </button>
             ))}
           </nav>
         </div>
       </header>
 
-      <main className="w-full max-w-3xl mx-auto px-4 py-8">
+      <main className="w-full max-w-3xl mx-auto px-4 pt-24 pb-8">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 flex items-center gap-2">
             <span className="text-xl">⚠️</span>
