@@ -423,8 +423,11 @@ export function setupRoutes(app: Express) {
         // 2. Fetch user settings to get Gemini Key and Bot Token
         const { data: userSettingsList } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).not('gemini_api_key', 'is', null).limit(1);
         const userSettings = userSettingsList && userSettingsList.length > 0 ? userSettingsList[0] : null;
+        
+        const botTokenToUse = process.env.TELEGRAM_BOT_TOKEN || (userSettings ? userSettings.telegram_bot_token : '');
+
         if (!userSettings || !userSettings.gemini_api_key) {
-          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', 'Error: Missing Gemini API key in user settings.');
+          await sendNotification(botTokenToUse || '', chatId, 'Debugging', '', 'Error: Missing Gemini API key in user settings.');
           return res.sendStatus(200);
         }
 
@@ -436,7 +439,7 @@ export function setupRoutes(app: Express) {
           if (fuzzyVideo) {
             video = fuzzyVideo;
           } else {
-            await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, 'Debugging', '', `Error: Video not found in database for extracted link: ${videoLink}`);
+            await sendNotification(botTokenToUse || '', chatId, 'Debugging', '', `Error: Video not found in database for extracted link: ${videoLink}`);
             return res.sendStatus(200);
           }
         }
@@ -451,7 +454,7 @@ export function setupRoutes(app: Express) {
 
         // 4. Handle "Total" Command for Reddit bypass
         if (userText.trim().toLowerCase() === 'total') {
-          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Full Post Content', video.link || '', 'Content\n\n' + (transcript || 'No content available.'));
+          await sendNotification(botTokenToUse || '', chatId, video.title || 'Full Post Content', video.link || '', 'Content\n\n' + (transcript || 'No content available.'));
           return res.sendStatus(200);
         }
 
@@ -483,9 +486,16 @@ ${transcript || video.summary || "No content available."}
 
           const answer = aiResponse.text || "I'm sorry, I couldn't process that question.";
 
+          // Clean Gemini Markdown for Telegram's legacy parser
+          const cleanAnswer = answer
+            .replace(/\*\*(.*?)\*\*/g, '*$1*') // Bold to Telegram bold
+            .replace(/#/g, '')                 // Strip headers
+            .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Strip markdown links to prevent unescaped nested parentheses errors
+            .replace(/_([^_]+)_/g, '$1');      // Strip underscores
+
           // 6. Reply to Telegram
           const msgType = isReddit ? 'Reddit Answer' : 'YouTube Answer';
-          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer', video.link || '', msgType + '\n\n' + answer);
+          await sendNotification(botTokenToUse || '', chatId, video.title || 'Answer', video.link || '', msgType + '\n\n' + cleanAnswer);
         } catch (genError: any) {
           console.error('Q&A AI Generation Error:', genError);
           const errMsg = typeof genError.message === 'string' ? genError.message : JSON.stringify(genError);
@@ -495,7 +505,7 @@ ${transcript || video.summary || "No content available."}
             fallbackAnswer = "⚠️ <b>AI Limit Hit</b>\nYou have exceeded your free Gemini API quota. Please check your billing or wait before asking more questions.";
           }
 
-          await sendNotification(process.env.TELEGRAM_BOT_TOKEN || '', chatId, video.title || 'Answer Error', video.link || '', 'Error\n\n' + fallbackAnswer);
+          await sendNotification(botTokenToUse || '', chatId, video.title || 'Answer Error', video.link || '', 'Error\n\n' + fallbackAnswer);
         }
 
         return res.sendStatus(200);
