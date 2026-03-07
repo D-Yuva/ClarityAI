@@ -57,6 +57,13 @@ function extractYoutubeId(url: string): string | null {
   return null;
 }
 
+// Extract Reddit ID from URL (bypasses URL corruption caused by Telegram stripping underscores)
+function extractRedditId(url: string): string | null {
+  const match = url.match(/reddit\.com\/r\/[^\/]+\/comments\/([a-zA-Z0-9]+)/);
+  if (match) return match[1];
+  return null;
+}
+
 // Normalize Reddit links for consistent database lookups
 function normalizeRedditLink(url: string): string {
   if (!url.includes('reddit.com')) return url;
@@ -445,6 +452,7 @@ export function setupRoutes(app: Express) {
 
         const videoLink = linkMatch[0];
         const videoId = extractYoutubeId(videoLink);
+        const redditId = extractRedditId(videoLink);
         const normalizedRedditLink = normalizeRedditLink(videoLink);
 
         // 2. Fetch user settings to get Gemini Key and Bot Token
@@ -461,9 +469,10 @@ export function setupRoutes(app: Express) {
         // 3. Get Video Info & Transcript
         let video = null;
         
-        // Strategy A: Youtube ID
-        if (videoId) {
-          const { data } = await supabase.from('videos').select('*').eq('video_id', videoId).single();
+        // Strategy A: Youtube or Reddit ID
+        const searchId = videoId || redditId;
+        if (searchId) {
+          const { data } = await supabase.from('videos').select('*').eq('video_id', searchId).single();
           video = data;
         }
 
@@ -526,7 +535,7 @@ ${transcript || video.summary || "No content available."}
 `;
 
           const aiResponse = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-flash-lite",
             contents: [{ parts: [{ text: prompt }] }],
           });
 
