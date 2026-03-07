@@ -57,6 +57,18 @@ function extractYoutubeId(url: string): string | null {
   return null;
 }
 
+// Normalize Reddit links for consistent database lookups
+function normalizeRedditLink(url: string): string {
+  if (!url.includes('reddit.com')) return url;
+  
+  let normalized = url.split('?')[0].replace(/\/$/, "");
+  normalized = normalized.replace('http://', 'https://');
+  if (!normalized.includes('://www.')) {
+    normalized = normalized.replace('://', '://www.');
+  }
+  return normalized;
+}
+
 // Helper to register global webhook on startup
 export async function bootstrapWebhooks() {
   // Auto-migrate YouTube channels that were saved with the wrong rss_url (channel page URL instead of XML feed URL)
@@ -433,6 +445,7 @@ export function setupRoutes(app: Express) {
 
         const videoLink = linkMatch[0];
         const videoId = extractYoutubeId(videoLink);
+        const normalizedRedditLink = normalizeRedditLink(videoLink);
 
         // 2. Fetch user settings to get Gemini Key and Bot Token
         const { data: userSettingsList } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).not('gemini_api_key', 'is', null).limit(1);
@@ -447,23 +460,33 @@ export function setupRoutes(app: Express) {
 
         // 3. Get Video Info & Transcript
         let video = null;
+        
+        // Strategy A: Youtube ID
         if (videoId) {
           const { data } = await supabase.from('videos').select('*').eq('video_id', videoId).single();
           video = data;
         }
 
+        // Strategy B: Absolute Link Match
         if (!video) {
           const { data: linkMatchVideo } = await supabase.from('videos').select('*').eq('link', videoLink).single();
           video = linkMatchVideo;
         }
 
+        // Strategy C: Normalized Link Match (Reddit focused)
+        if (!video && videoLink.includes('reddit.com')) {
+          const { data: normalizedVid } = await supabase.from('videos').select('*').ilike('link', `%${normalizedRedditLink}%`).single();
+          video = normalizedVid;
+        }
+
+        // Strategy D: Fuzzy Link Match
         if (!video) {
           const { data: fuzzyVideo } = await supabase.from('videos').select('*').ilike('link', `${videoLink}%`).single();
           video = fuzzyVideo;
         }
 
         if (!video) {
-          await sendNotification(botTokenToUse || '', chatId, 'Debugging', '', `Error: Video not found in database for extracted link: ${videoLink}`);
+          await sendNotification(botTokenToUse || '', chatId, 'Debugging', '', `Error: Video not found in database for link: ${videoLink}`);
           return res.sendStatus(200);
         }
 
