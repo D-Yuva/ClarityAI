@@ -44,6 +44,19 @@ async function setTelegramWebhook(botToken: string) {
   }
 }
 
+// Extract 11-char YouTube ID from various URL formats
+function extractYoutubeId(url: string): string | null {
+  const patterns = [
+    /(?:v=|\/shorts\/|\/embed\/|youtu\.be\/|\/v\/|\/e\/|watch\?v=|&v=)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ];
+  for (const p of patterns) {
+    const match = url.match(p);
+    if (match) return match[1];
+  }
+  return null;
+}
+
 // Helper to register global webhook on startup
 export async function bootstrapWebhooks() {
   // Auto-migrate YouTube channels that were saved with the wrong rss_url (channel page URL instead of XML feed URL)
@@ -419,6 +432,7 @@ export function setupRoutes(app: Express) {
         }
 
         const videoLink = linkMatch[0];
+        const videoId = extractYoutubeId(videoLink);
 
         // 2. Fetch user settings to get Gemini Key and Bot Token
         const { data: userSettingsList } = await supabase.from('user_settings').select('*').eq('telegram_chat_id', chatId).not('gemini_api_key', 'is', null).limit(1);
@@ -432,16 +446,25 @@ export function setupRoutes(app: Express) {
         }
 
         // 3. Get Video Info & Transcript
-        let { data: video } = await supabase.from('videos').select('*').eq('link', videoLink).single();
+        let video = null;
+        if (videoId) {
+          const { data } = await supabase.from('videos').select('*').eq('video_id', videoId).single();
+          video = data;
+        }
+
+        if (!video) {
+          const { data: linkMatchVideo } = await supabase.from('videos').select('*').eq('link', videoLink).single();
+          video = linkMatchVideo;
+        }
 
         if (!video) {
           const { data: fuzzyVideo } = await supabase.from('videos').select('*').ilike('link', `${videoLink}%`).single();
-          if (fuzzyVideo) {
-            video = fuzzyVideo;
-          } else {
-            await sendNotification(botTokenToUse || '', chatId, 'Debugging', '', `Error: Video not found in database for extracted link: ${videoLink}`);
-            return res.sendStatus(200);
-          }
+          video = fuzzyVideo;
+        }
+
+        if (!video) {
+          await sendNotification(botTokenToUse || '', chatId, 'Debugging', '', `Error: Video not found in database for extracted link: ${videoLink}`);
+          return res.sendStatus(200);
         }
 
         let transcript = video.transcript || "";
@@ -481,7 +504,7 @@ ${transcript || video.summary || "No content available."}
 
           const aiResponse = await ai.models.generateContent({
             model: "gemini-1.5-flash",
-            contents: prompt,
+            contents: [{ parts: [{ text: prompt }] }],
           });
 
           const answer = aiResponse.text || "I'm sorry, I couldn't process that question.";
@@ -505,7 +528,7 @@ ${transcript || video.summary || "No content available."}
             fallbackAnswer = "⚠️ <b>AI Limit Hit</b>\nYou have exceeded your free Gemini API quota. Please check your billing or wait before asking more questions.";
           }
 
-          await sendNotification(botTokenToUse || '', chatId, video.title || 'Answer Error', video.link || '', 'Error\n\n' + fallbackAnswer);
+          await sendNotification(botTokenToUse || '', chatId, video.title || 'Answer Error', video.link || '', 'Error\n\n' + fallbackAnswer + (errMsg ? `\n\nDetails: ${errMsg.slice(0, 100)}...` : ''));
         }
 
         return res.sendStatus(200);
